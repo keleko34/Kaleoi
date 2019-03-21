@@ -1,0 +1,41 @@
+.stylesheet {
+  color: {{>color}};
+  background: {{color}};
+  font-size: {{fontSize}}px;
+  {{fontWeight}};
+  {{decoration}};
+  {{marginTop}}: 12px;
+  {{marginBottom}}: {{mB}};
+  {{marginRight}}: {{mR}};
+  {{marginLeft}}: {{mL}}px;
+  {{computePaddingTop}}: 12px;
+  {{computePaddingBottom}}: {{mB}};
+  {{computePaddingRight}}: {{mR}};
+  {{computePaddingLeft}}: {{mL}}px;
+}
+
+.stylesheet__inner{{local}} {
+  color: {{>color}};
+  background: {{color}};
+  font-size: {{fontSize}}px;
+  {{fontWeight}};
+  {{decoration}};
+  {{marginTop}}: 12px;
+  {{marginBottom}}: {{mB}};
+  {{marginRight}}: {{mR}};
+  {{marginLeft}}: {{mL}}px;
+  {{computePaddingTop}}: 12px;
+  {{computePaddingBottom}}: {{mB}};
+  {{computePaddingRight}}: {{mR}};
+  {{computePaddingLeft}}: {{mL}}px;
+}
+
+.stylesheet__test {
+  {{style | checkStyles}}
+}
+
+.stylesheet__test__inner{{local}} {
+  {{style | checkStyles}}
+}
+
+.stylesheet__{{inline}} { background: '#F00F00'; }

@@ -1,2 +1,3 @@
 # Kaleoi
-A designer friendly MVVM component based framework
+> A designer friendly MVVM component based framework
+
