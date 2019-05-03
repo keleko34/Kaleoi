@@ -5,17 +5,71 @@ window.__KaleoiExtensions__ = {
 
 window.kaleoi = (function(){
   
+  /* LOCALS */
+  /* REGION */
   var __config = __KaleoiExtensions__.config,
       __components = __KaleoiExtensions__.components,
       __model = __KaleoiExtensions__.model,
-      __slice = Array.prototype.slice;
+      __slice = Array.prototype.slice,
+      __mapTypes = [          
+          /* Creates a data bind (dom Two-way bind if it is not dirty) */
+          'standard',
+          
+          /* Creates a data bind to the event property */
+          'event',
+          
+          /* Creates a data bind to the stylesheet textContent, possible types: standard, attr, full */
+          'stylesheet',
+          
+          /* Creates a data bind to the style object, possible types: standard, attr, full */
+          'style',
+          
+          /* Creates an attr name and value data bind */
+          'attr',
+          
+          /* Creates an array looped data bind */
+          'loop',
+          
+          /* Creates a component name based data bind */
+          'node',
+          
+          /* Passes a data bind to a sub component */
+          'pointer'
+      ];
+  
+  /* helps event bind name checks */
+  var __EventList__ = Object.keys(HTMLElement.prototype).filter(function(v){return (v.indexOf('on') === 0);})
+      .concat([
+        'onDOMContentLoaded','onDOMAttributeNameChanged',
+        'onDOMAttrModified','onDOMCharacterDataModified',
+        'onDOMNodeInserted','onDOMNodeRemoved',
+        'onDOMSubtreeModified'])
+      .map(function(v){ return (v.toLowerCase()); });
+  
+  /* ENDREGION */
   
   /* REGEX */
   /* REGION */
   
   var __matchThisVariable = /(var[\s+]?(.*?)[\s+]?=[\s+]?this([;]?))/g,
       __matchThisProperties = /(this\.(.*?)([\s;=]))/g,
-      __matchThisPropertiesVariable = '($variable\.(.*?)([\s;=]))'
+      __matchThisPropertiesVariable = '($variable\.(.*?)([\s;=]))',
+      __replaceFunctionName = /^(function)\s?(.*?)\((.[\r\n]*?)+$/;
+  
+  /* ENDREGION */
+  
+  /* ERRORS */
+  /* REGION */
+  
+  function ERROR_PROPERTYBIND(data, value, func)
+  {
+    if(!value || typeof value !== 'object')
+    {
+      var funcName = (typeof func === 'function' ? ' Function::' + getFunctionName(func) : '')
+      throw new Error(value + ' does not match the [prop, value] or {prop:value} format' + funcName + ' on component ' + data.title);
+    }
+    return true;
+  }
   
   /* ENDREGION */
   
@@ -71,16 +125,6 @@ window.kaleoi = (function(){
   
   /* FILE HANDLING */
   /* REGION */
-  
-  function createStyle(title, style)
-  {
-    var st = document.createElement('style');
-    st.title = title;
-    st.type = 'text/css';
-    st.textContent = style;
-    document.head.appendChild(st);
-    return st;
-  }
   
   function createScript(title, script)
   {
@@ -221,6 +265,11 @@ window.kaleoi = (function(){
   /* HELPER METHODS */
   /* REGION */
   
+  function getKey(key)
+  {
+    return (key.split('.').pop());
+  }
+  
   function getDescriptor(value,writable,enumerable, redefinable)
   {
     return {
@@ -304,6 +353,7 @@ window.kaleoi = (function(){
   {
     var funcString = func.toString(),
         matchVariable = funcString.match(__matchThisVariable),
+        matchProperties = funcString.match(__matchThisProperties),
         variable,
         rx,
         variableProperties = [];
@@ -318,24 +368,21 @@ window.kaleoi = (function(){
       });
     }
     
-    return funcString.match(__matchThisProperties)
-    .map(function(v){
-      return v.replace(__matchThisProperties, '$2');
-    })
-    .concat(variableProperties);
+    if(matchProperties)
+    {
+      return matchProperties
+      .map(function(v){
+        return v.replace(__matchThisProperties, '$2');
+      })
+      .concat(variableProperties);
+    }
+    
+    return [];
   }
   
-  function stringifyStylesheetObject(obj)
+  function getFunctionName(func)
   {
-    var keys = Object.keys(obj),
-        text = '',
-        len = keys.length,
-        x = 0;
-    for(x;x<len;x++)
-    {
-      text += keys[x] + ':' + obj[keys[x]] + ';'
-    }
-    return text;
+    return (func.name || func.toString().replace(__replaceFunctionName, '$2') || func.toString());
   }
   
   /* ENDREGION */
@@ -626,7 +673,7 @@ window.kaleoi = (function(){
   
   function removeComponent(component)
   {
-    component.__CzosnekRoot__.destruct();
+    // component.__CzosnekRoot__.destruct();
     component.parentElement.removeChild(component);
   }
   
@@ -654,8 +701,6 @@ window.kaleoi = (function(){
       root: __expanded
     }))
     
-    /* TODO: Possibly add root to each element in the component */
-    
     if(component.parentElement) component.parentElement.replaceChild(__expanded, component);
     
     for(x;x<len;x++){ handleMaps(__maps[x], __vm) }
@@ -678,6 +723,372 @@ window.kaleoi = (function(){
     return value;
   }
   
+  function handleMaps(map, data)
+  {
+    /*see map types in locals */
+    var mapType = __mapTypes.indexOf(map.type);
+    
+    /* overwrite data with stored data if was used */
+    storageHelper(map.key, map.filters, data);
+    
+    map.value = data.get(map.key);
+    
+    if(!map.value) return (!!console.error('Component: ' + data.name, new Error('You are missing the viewmodel property of ' + map.key)));
+    
+    if(typeof map.value === 'function') map.value = map.value.bind(data);
+    
+    /* set stop bind method, (stops updates to prevent stack overflow) */
+    map.stop = ((map.local && map.local.stop) ? map.local.stop.bind(map.local) : map.node.stop.bind(map.node));
+    
+    switch(mapType)
+    {
+      case 0:
+        return handleStandard(map, data);
+      case 1:
+        return handleEvent(map, data);
+      case 2:
+        return handleStyleSheet(map, data);
+      case 3:
+        return handleStyle(map, data);
+      case 4:
+        return handleAttr(map, data);
+      case 5:
+        return handleLoop(map, data);
+      case 6:
+        return handleNode(map, data);
+      case 7:
+        return handlePointer(map, data);
+    }
+  }
+  
+  /* adds the listeners for properties that were used in compute functions */
+  function addInnerFunctionListeners(map, data, func)
+  {
+    var __layer,
+        __key,
+        __inner = getFunctionVariables(func),
+        len = __inner.length,
+        x = 0;
+    for(x;x<len;x++)
+    {
+      __layer = data.findLayer(__inner[x]);
+      __key = getKey(__inner[x])
+      __layer.addEventListener(__key,map.datalistener);
+    }
+  }
+  
+  /* removes the listeners for properties that were used in compute functions */
+  function removeInnerFunctionListeners(map, data, func)
+  {
+    var __layer,
+        __key,
+        __inner = getFunctionVariables(func),
+        len = __inner.length,
+        x = 0;
+    for(x;x<len;x++)
+    {
+      __layer = data.findLayer(__inner[x]);
+      __key = getKey(__inner[x])
+      __layer.removeEventListener(__key,map.datalistener);
+    }
+  }
+  
+  /* STANDARD */
+  function loopStandardValue(mapText, data)
+  {
+    var __text = '',
+        __map,
+        __val,
+        __dataFilters = data.filters,
+        x = 0,
+        len = mapText.length;
+    for(x;x<len;x++)
+    {
+      __map = mapText[x];
+      if(typeof __map === 'string')
+      {
+        __text += __map;
+      }
+      else if(__map.value !== undefined)
+      {
+        __val = runThroughFilters(typeof __map.value === 'function' ? __map.value() : __map.value, __map.filters.filters, __dataFilters);
+        __text += __val;
+        if(__map.isInsert)
+        {
+          __map.mapText[x] = __val;
+          __map.maps[__map.mapIndex] = __val;
+        }
+      }
+    }
+    return __text;
+  }
+  
+  function handleStandard(map, data)
+  {
+    var __layer = data.findLayer(map.key),
+        __key = getKey(map.key);
+    
+    map.local[map.localAttr] = loopStandardValue(map.mapText, data);
+    if(!map.isInsert)
+    {
+      map.datalistener = standardDataListener(map, data, __layer, __key);
+      map.datafunctionlistener = standardFunctionDataListener(map, data, __layer, __key);
+      map.domlistener = standardDomListener(map, data, __layer, __key);
+      map.domfunctionlistener = standardFunctionDomListener(map, data, __layer, __key);
+      
+      if(typeof map.value === 'function')
+      {
+        __layer.addEventListener(__key, map.datafunctionlistener);
+        if(!map.isDirty) map.node.addEventListener(map.listener, map.domfunctionlistener);
+      }
+      else
+      {
+        __layer.addEventListener(__key, map.datalistener);
+        if(!map.isDirty) map.node.addEventListener(map.listener, map.domlistener);
+      }
+    }
+  }
+  
+  function standardDataListener(map, data, layer, dbkey)
+  {
+    /* So when the event fires and we use a debugger we have the name of the method */
+    return function standardDataListener(e)
+    {
+      if(typeof e.value === 'function')
+      {
+        /* Remove old listeners */
+        layer.removeEventListener(dbkey + 'update', map.datalistener);
+        if(!map.isDirty) map.node.removeEventListener(map.localAttr + 'update', map.domlistener);
+        
+        /* bind function to the viewmodel */
+        map.value = (e.value).bind(data);
+        
+        /* Add the new data listeners */
+        layer.addEventListener(dbkey, map.datafunctionlistener);
+        addInnerFunctionListeners(map, data, map.value);
+        
+        /* Set the dom property */
+        map.stop()[map.localAttr] = loopStandardValue(map.mapText, data);
+        
+        /* Add the dom listeners */
+        if(!map.isDirty) map.node.addEventListener(map.localAttr, map.domfunctionlistener);
+      }
+      else
+      {
+        map.value = e.value;
+        map.stop()[map.localAttr] = loopStandardValue(map.mapText, data);
+      }
+    }
+  }
+  
+  function standardFunctionDataListener(map, data, layer, dbkey)
+  {
+    return function standardFunctionDataListener(e)
+    {
+      if(typeof e.value !== 'function')
+      {
+        /* Remove listeners */
+        removeInnerFunctionListeners(map, data, map.value);
+        layer.removeEventListener(dbkey, map.datafunctionlistener);
+        if(!map.isDirty) map.node.removeEventListener(map.localAttr, map.domfunctionlistener);
+        
+        /* Add new data listeners */
+        layer.addEventListener(dbkey + 'update', map.datalistener);
+        
+        /* set the dom property */
+        map.value = e.value;
+        map.stop()[map.localAttr] = loopStandardValue(map.mapText, data);
+        
+        /* Add dom listener */
+        if(!map.isDirty) map.node.addEventListener(map.localAttr + 'update', map.domlistener);
+      }
+      else
+      {
+        /* Remove inner listeners */
+        removeInnerFunctionListeners(map, data, map.value);
+        
+        /* bind the new function to the viewmodel */
+        map.value = (e.value).bind(data);
+        
+        /* add new inner listeners */
+        addInnerFunctionListeners(map, data, map.value);
+        
+        /* set the dom property */
+        map.stop()[map.localAttr] = loopStandardValue(map.mapText, data);
+      }
+    }
+  }
+  
+  function standardDomListener(map, data, layer, dbkey)
+  {
+    return function standardDomListener(e)
+    {
+      if(typeof e.value === 'function')
+      {
+        /* Remove old listeners */
+        layer.removeEventListener(dbkey + 'update', map.datalistener);
+        map.node.removeEventListener(map.localAttr + 'update', map.domlistener);
+        
+        /* bind function to the viewmodel */
+        map.value = (e.value).bind(data);
+        
+        /* Set the data property */
+        layer.stop()[dbkey] = map.value;
+        
+        /* Add the new data listeners */
+        layer.addEventListener(dbkey, map.datafunctionlistener);
+        addInnerFunctionListeners(map, data, map.value);
+        
+        /* Set the dom property */
+        map.stop()[map.localAttr] = loopStandardValue(map.mapText, data);
+        
+        /* Add the dom listeners */
+        map.node.addEventListener(map.localAttr, map.domfunctionlistener);
+      }
+      else
+      {
+        map.value = e.value;
+        layer.stop()[dbkey] = map.value;
+      }
+    }
+  }
+  
+  function standardFunctionDomListener(map, data, layer, dbkey)
+  {
+    return function standardFunctionDomListener(e)
+    {
+      /* if this is a stopped event we want to stop the changes */
+      if(e.stopped) return (e.srcElement.__pikantnyExtensions__.stop = undefined);
+      
+      if(typeof e.value !== 'function')
+      {
+        /* remove the listeners */
+        removeInnerFunctionListeners(map, data, map.value);
+        layer.removeEventListener(dbkey, map.datafunctionlistener);
+        map.node.removeEventListener(map.localAttr, map.domfunctionlistener);
+        
+        /* set the data value */
+        map.value = e.value;
+        layer.stop()[dbkey] = map.value;
+        
+        /* add the listeners */
+        layer.addEventListener(dbkey + 'update', map.datalistener);
+        map.node.addEventListener(map.localAttr, map.domlistener);
+      }
+      else
+      {
+        e.preventDefault();
+        
+        /* remove the inner listeners */
+        removeInnerFunctionListeners(map, data, map.value);
+        
+        /* bind function to the viewmodel and set data */
+        map.value = (e.value).bind(data);
+        layer.stop()[dbkey] = map.value;
+        
+        addInnerFunctionListeners(map, data, map.value);
+        
+        /* set the dom property */
+        map.stop()[map.localAttr] = loopStandardValue(map.mapText, data);
+      }
+    }
+  }
+  
+  /* EVENT */
+  function handleEvent(map, data)
+  {
+    var __layer = data.findLayer(map.key),
+        __key = getKey(map.key);
+    
+    /* Error if the wrong type */
+    if(typeof __layer[__key] !== 'function') return ERROR_PROPERTYBIND(data, __layer[__key], handleEvent);
+    
+    /* Set the event */
+    map.node[map.property] = map.value;
+    
+    if(!map.insert)
+    {
+      map.datalistener = eventDataListener(map, data, __layer, __key);
+      map.domlistener = eventDomListener(map, data, __layer, __key);
+      
+      __layer.addEventListener(__key, map.datalistener);
+      map.node.addEventListener(map.property, map.domlistener);
+    }
+  }
+  
+  function eventDataListener(map, data, layer, dbkey)
+  {
+    return function eventDataListener(e)
+    {
+      if(typeof e.value !== 'function')
+      {
+        e.preventDefault();
+        return ERROR_PROPERTYBIND(data, layer[dbkey], eventDataListener);
+      }
+      else
+      {
+        map.value = e.value.bind(data);
+        map.node.stop()[map.property] = map.value;
+      }
+    }
+  }
+  
+  function eventDomListener(map, data, layer, dbkey)
+  {
+    return function eventDomListener(e)
+    {
+      if(typeof e.value !== 'function')
+      {
+        e.preventDefault();
+        return ERROR_PROPERTYBIND(data, layer[dbkey], eventDomListener);
+      }
+      else
+      {
+        map.value = e.value.bind(data);
+        layer.stop()[dbkey] = map.value;
+      }
+    }
+  }
+  
+  /* STYLESHEET */
+  function handleStyleSheet(map, data)
+  {
+    
+  }
+  
+  /* STYLE */
+  function handleStyle(map, data)
+  {
+    
+  }
+  
+  /* ATTRIBUTE NAME */
+  function handleAttr(map, data)
+  {
+    
+  }
+  
+  /* LOOP */
+  function handleLoop(map, data)
+  {
+    
+  }
+  
+  /* NODE */
+  function handleNode(map, data)
+  {
+    
+  }
+  
+  /* COMPONENT ATTRIBUTE [POINTER] */
+  function handlePointer(map, data)
+  {
+    
+  }
+  /* ENDREGION */
+  
+  
+  /* TODO: replace with map type equivelants */
   function runThroughMaps(mapText, data)
   {
     var __map,
@@ -713,7 +1124,7 @@ window.kaleoi = (function(){
         }
         else if(__map.isFullStyle)
         {
-          __value = (typeof __map.value === 'function' ? __map.value.call(data, __map.funcValue) : __map.value);
+          __value = (typeof __map.value === 'function' ? __map.value() : __map.value);
           if(typeof __value !== 'object')
           {
             console.error(new Error('A full class stylesheet bind must return an object of styles'))
@@ -721,13 +1132,13 @@ window.kaleoi = (function(){
           }
           else
           {
-            __value = runThroughFilters(__value, __map.filters.filters, data.filters);
-            __text += stringifyStylesheetObject(__value);
+            __value = parseAttrNameReturn(runThroughFilters(__value, __map.filters.filters, data.filters));
+            __text += (__map.isInlineStyle ? __value[1] : (__value[0] + ':' + __value[1] + ';'));
           }
         }
         else if(__map.isFullProp)
         {
-          __value = (typeof __map.value === 'function' ? __map.value.call(data, __map.funcValue) : __map.value);
+          __value = (typeof __map.value === 'function' ? __map.value() : __map.value);
           if(typeof __value !== 'object')
           {
             console.error(new Error('A full property stylesheet bind must return an object of style name and value'))
@@ -738,11 +1149,11 @@ window.kaleoi = (function(){
             __value = parseAttrNameReturn(__value, '');
           }
           __value = runThroughFilters(__value, __map.filters.filters, data.filters);
-          __text += (__value[0] + ':' + __value[1]);
+          __text += (__map.isInlineStyle ? __value[1] : (__value[0] + ':' + __value[1]));
         }
         else
         {
-          __value = (typeof __map.value === 'function' ? __map.value.call(data, __map.funcValue) : __map.value);
+          __value = (typeof __map.value === 'function' ? __map.value() : __map.value);
           __text += runThroughFilters(__value, __map.filters.filters, data.filters);
         }
         if(__map.type === 'insert')
@@ -774,7 +1185,7 @@ window.kaleoi = (function(){
       else
       {
         if(!__map.value) __map.value = data.get(__map.key);
-        __value = (typeof __map.value === 'function' ? __map.value.call(data, __map.funcValue) : __map.value);
+        __value = (typeof __map.value === 'function' ? __map.value() : __map.value);
         __text += runThroughFilters(__value, __map.filters.filters, data.filters);
         if(__map.type === 'insert') {
           __values[x] = __value;
@@ -786,20 +1197,58 @@ window.kaleoi = (function(){
     return __text;
   }
   
-  /* TODO: extend function type values to listen to inside properties */
-  function handleMaps(map, data)
+  /* TODO: destruct maps is forever looping */
+  function handleMaps__old(map, data)
   {
-    switch(map.type)
+    /*see map types in locals */
+    var mapType = __mapTypes.indexOf(map.type);
+    
+    /* overwrite data with stored data if was used */
+    storageHelper(map.key, map.filters, data);
+    
+    map.value = data.get(map.key);
+    
+    if(!map.value) return (!!console.error('Component: ' + data.name, new Error('You are missing the viewmodel property of ' + map.key)));
+    
+    if(!map.stop)
     {
-      case 'insert':
-        return insert(map, data);
-      case 'standard':
-        return standard(map, data);
-      case 'event':
-        return event(map, data);
-      case 'stylesheet':
+      /* set stop bind method, (stops updates to prevent stack overflow) */
+      map.stop = ((map.local && map.local.stop) ? map.local : ({ stop: function(){
+        map.node.stop();
+        return map.local;
+      }}));
+    }
+    
+    switch(mapType)
+    {
+      case 0:
+        map.local[map.localAttr] = loopStandardMaps(map.mapText, data);
+        if(!map.isInsert)
+        {
+          data.addEventListener(map.key, ((typeof map.value === 'function') ? DataFunctionListener(map, data) : DataListener(map, data)));
+          
+          if(!map.isDirty)
+          {
+            map.node.addEventListener(map.property, ((typeof map.value === 'function') ? DomFunctionListener(map, data) : DomListener(map, data)))
+          }
+        }
+        return;
+      case 1:
+        if(typeof map.value !== 'function') return (!!console.error('Component: ' + data.name, new Error(map.key + ' is attempting to bind to an event but is not a function')))
+        if(map.isInsert)
+        {
+          map.node[map.property] = map.value;
+        }
+        else
+        {
+          map.node[map.property] = map.value;
+          data.addEventListener(map.key, DataEventListener(map, data));
+          map.node.addEventListener(map.property, DomEventListener(map, data));
+        }
+        return;
+      case 2:
         return stylesheet(map, data);
-      case 'style':
+      case 3:
         return style(map, data);
     }
   }
@@ -808,47 +1257,51 @@ window.kaleoi = (function(){
   function insert(map, data)
   {
     var __key = map.key,
-        __filters = map.filters;
+        __filters = map.filters,
+        __item;
     
     /* overwrite data with stored data if was used */
     storageHelper(__key, __filters, data);
     
     map.value = data.get(__key);
     
-    map.local[map.localAttr] = runThroughMaps(map.mapText, data);
-  }
-  
-  function standard(map, data)
-  {
-    var __key = map.key,
-        __filters = map.filters;
+    if(!map.value) return (!!console.error('Component: ' + data.name, new Error('You are missing the binding property of ' + __key)));
     
-    /* overwrite data with stored data if was used */
-    storageHelper(__key, __filters, data);
-    
-    map.value = data.get(__key);
-    
-    /* VALUE AND TEXT INSERT */
-    map.local[map.localAttr] = runThroughMaps(map.mapText, data);
-    
-    if(!map.isDirty) bindDom(__key, map, data);
-    if(typeof map.value === 'function' && !map.isEvent) bindFunction(map, data);
-    bindData(__key, map, data);
-  }
-  
-  function event(map, data)
-  {
-    var __key = map.key;
-    
-    map.local.removeAttribute(map.localAttr);
-    
-    map.value = data.get(__key);
-    
-    /* VALUE AND TEXT INSERT */
-    map.local[map.localAttr] = map.value;
-    
-    bindDom(__key, map, data);
-    bindData(__key, map, data);
+    if(map.property === 'style')
+    {
+      if(map.isFullStyle)
+      {
+        var __val = (typeof map.value === 'function' ? map.value() : map.value),
+            __keys = Object.keys((__val || {})),
+            len = __keys.length,
+            x = 0;
+        
+        for(x;x<len;x++)
+        {
+          map.local[__keys[x]] = runThroughFilters(__val[__keys[x]], map.filters.filters, data.filters);
+        }
+      }
+      else if(map.isFullProp)
+      {
+        
+      }
+      else if(map.values.length)
+      {
+        __val = runThroughValueMaps(map, data),
+        __item = parseAttrNameReturn(typeof map.value === 'function' ? map.value(__val) : map.value, __val);
+        /* VALUE AND TEXT INSERT */
+        map.local[__item[0]] = __item[1];
+      }
+      else
+      {
+        /* VALUE AND TEXT INSERT */
+        map.local[map.localKey] = (typeof map.value === 'function' ? map.value() : map.value);
+      }
+    }
+    else
+    {
+      map.local[map.localAttr] = runThroughMaps(map.mapText, data);
+    }
   }
   
   function stylesheet(map, data)
@@ -861,6 +1314,7 @@ window.kaleoi = (function(){
     
     map.value = data.get(__key);
     
+    if(!map.value) return (!!console.error('Component: ' + data.name, new Error('You are missing the binding property of ' + __key)));
     /* VALUE AND TEXT INSERT */
     map.local[map.localAttr] = runThroughMaps(map.mapText, data);
     if(typeof map.value === 'function')
@@ -869,9 +1323,9 @@ window.kaleoi = (function(){
     }
     else
     {
-      bindData(__key, map, data);
+      bindData(map, data);
     }
-    if(map.values.length) bindStylesheetData(__key, map, data);
+    if(map.values.length) bindValuesData(__key, map, data);
   }
   
   function style(map, data)
@@ -879,6 +1333,7 @@ window.kaleoi = (function(){
     var __key = map.key,
         __filters = map.filters,
         __keys = [],
+        __val,
         __item,
         len,
         x = 0;
@@ -887,18 +1342,443 @@ window.kaleoi = (function(){
     storageHelper(__key, __filters, data);
     
     map.value = data.get(__key);
-    __keys = Object.keys(map.value);
-    len = __keys.length;
     
-    /* VALUE AND TEXT INSERT */
+    if(!map.value) return (!!console.error('Component: ' + data.name, new Error('You are missing the binding property of ' + __key)));
+    if(map.isFullStyle)
+    {
+      __val = (typeof map.value === 'function' ? map.value() : map.value)
+      __keys = Object.keys((__val || {}));
+      len = __keys.length;
+      for(x;x<len;x++)
+      {
+        __item = __val[__keys[x]];
+        map.local[__keys[x]] = runThroughFilters(__item, map.filters.filters, data.filters);
+        if(typeof map.value === 'function')
+        {
+          bindFunction(map, data, __keys[x]);
+          bindDomFunction(map, data, __keys[x]);
+        }
+        else
+        {
+          bindData(map, data, __keys[x]);
+          bindDom(map, data, __keys[x])
+        }
+      }
+    }
+    else if(map.values.length || map.isFullProp)
+    {
+      __val = (map.isFullProp ? '' : runThroughValueMaps(map, data));
+      __item = parseAttrNameReturn(typeof map.value === 'function' ? map.value(__val) : map.value, __val);
+      
+      /* VALUE AND TEXT INSERT */
+      map.local[__item[0]] = __item[1];
+      
+      bindProperty(map, data);
+    }
+    else
+    {
+      /* VALUE AND TEXT INSERT */
+      map.local[map.localKey] = (typeof map.value === 'function' ? map.value() : map.value);
+      if(typeof map.value === 'function')
+      {
+        bindFunction(map, data, map.localKey);
+        bindDomFunction(map, data, map.localKey);
+      }
+      else
+      {
+        bindData(map, data, map.localKey);
+        bindDom(map, data, map.localKey)
+      }
+    }
+  }
+  
+  /* ENDREGION */
+  
+  /* BIND HELPERS */
+  /* REGION */
+  
+  /* adds all sub required listeners for style/attr property names */
+  function addObjectPropertyListeners(map, data)
+  {
+    var __layer,
+        __key,
+        __value = data.get(map.key),
+        __isFunction,
+        __isDataObject = (__value && typeof __value === 'object'),
+        maps = map.mapValues,
+        item,
+        prop = map.valueProp,
+        len = maps.length,
+        x = 0;
     for(x;x<len;x++)
     {
-      __item = map.value[__keys[x]];
-      map.local[map.localAttr][__keys[x]] = runThroughStyleMap(__keys[x], __item);
-      if(typeof __item === 'function') bindStyleFunction(map, __keys[x], __item);
-      bindStyleData(map, __keys[x], __item);
-      bindStyleDom(map, __keys[x], __item);
+      item = maps[x];
+      __layer = data.getLayer(item.key);
+      __key = getKey(item.key);
+      __value = __layer[__key];
+      __isFunction = (typeof __value === 'function');
+      
+      /* set item.datalistener */
+      item.datalistener = (__isFunction ? DataFunctionListener(map, data, __value) : DataListener(map, data, __value));
+      __layer.addEventListener(__key + (__isFunction ? '' : 'update'), item.datalistener);
+      if(!item.isDirty)
+      {
+        /* set item.domlistener */
+        map.domlistener = DomListener(map, data);
+        map.node.addEventListener(prop + (__isFunction ? '' : 'update'), map.domlistener);
+      }
     }
+    if(!maps || !maps.length)
+    {
+      /* set item.domlistener */
+      map.domlistener = DomListener(map, data);
+      map.node.addEventListener(prop + 'update', map.domlistener);
+    }
+    if(__isDataObject)
+    {
+      /* set map.secondlistener */
+      map.secondlistener = DataPropertyValueListener(map);
+      data.get(map.key).addEventListener('*update', map.secondlistener);
+    }
+  }
+  
+  /* removes all sub required listeners for style/attr property names */
+  function removeObjectPropertyListeners(map, data)
+  {
+    var maps = map.mapValues,
+        item,
+        prop = map.valueprop,
+        len = maps.length,
+        x = 0;
+    for(x;x<len;x++)
+    {
+      item = maps[x];
+      data.removeEventListener(item.key, item.datalistener);
+      if(!item.isDirty) map.node.removeEventListener(prop, item.domlistener);
+      item.datalistener = undefined;
+      item.domlistener = undefined;
+    }
+    if(map.domlistener)
+    {
+      map.node.removeEventListener(prop, map.domlistener);
+      map.domlistener = undefined;
+    }
+    if(map.secondlistener)
+    {
+      data.get(map.key).removeEventListener('*update', map.secondlistener);
+      map.secondlistener = undefined;
+    }
+  }
+  
+  /* ENDREGION */
+  
+  /* DATA LISTENERS (FOR UPDATING THE DOM) */
+  /* REGION */
+  
+  /* this is meant for simple data binds */
+  function DataListener(map, data, key)
+  {
+    return function(e)
+    {
+      if(typeof e.value === 'function')
+      {
+        data.removeEventListener(map.key + 'update', map.datalistener);
+        if(!map.isDirty) map.node.removeEventListener((key || map.localAttr) + 'update', map.domlistener);
+        map.value = (e.value).bind(data);
+
+        /* Set new listeners */
+        map.datalistener = DataFunctionListener(map, data, key);
+        data.addEventListener(map.key, map.datalistener);
+        addInnerFunctionListeners(map, data, map.value);
+        map.stop()[(key || map.localAttr)] = runThroughMaps(map.mapText, data);
+        if(!map.isDirty)
+        {
+          map.domlistener = DomFunctionListener(map, data, key);
+          map.node.addEventListener((key || map.localAttr), map.domlistener);
+        }
+      }
+      else
+      {
+        map.value = e.value;
+        map.stop()[(key || map.localAttr)] = runThroughMaps(map.mapText, data);
+      }
+    }
+  }
+  
+  /* This is meant for simple compute function binds */
+  function DataFunctionListener(map, data, key)
+  {
+    return function(e)
+    {
+      if(typeof e.value !== 'function')
+      {
+        removeInnerFunctionListeners(map, data, map.value);
+        data.removeEventListener(map.key, map.datalistener);
+        if(!map.isDirty) map.node.removeEventListener((key || map.localAttr), map.domlistener);
+        
+        /* Set new listeners */
+        map.datalistener = DataListener(map, data, key);
+        data.addEventListener(map.key + 'update', map.datalistener);
+        if(!map.isDirty)
+        {
+          map.domlistener = DomListener(map, data, key);
+          map.node.addEventListener((key || map.localAttr) + 'update', map.domlistener);
+        }
+        map.stop()[(key || map.localAttr)] = runThroughMaps(map.mapText, data);
+      }
+      else
+      {
+        removeInnerFunctionListeners(map, data, map.value);
+        map.value = (e.value).bind(data);
+        addInnerFunctionListeners(map, data, map.value);
+        map.stop()[(key || map.localAttr)] = runThroughMaps(map.mapText, data);
+      }
+    }
+  }
+  
+  function DataEventListener(map, data)
+  {
+    return function(e)
+    {
+      map.value = e.value.bind(data);
+      map.stop()[map.localAttr] = map.value;
+    }
+  }
+  
+  /* This is meant for attr/style property name binds and their values */
+  function DataPropertyListener(map, data)
+  {
+    var __mapValue = map.value,
+        __val,
+        __value,
+        __obj;
+    
+    if(!map.stop)
+    {
+      /* set stop bind method, (stops updates to prevent stack overflow) */
+      map.stop = ((map.local && map.local.stop) ? map.local : ({ stop: function(){
+        map.node.stop();
+        return map.local;
+      }}));
+    }
+    
+    /* initial value set */
+    if(typeof __mapValue === 'function')
+    {
+      __val = runThroughValueMaps(map, data);
+      __value = __mapValue(__val);
+    }
+    else
+    {
+      __value = (typeof __mapValue !== 'object' ? [__mapValue, ''] : __mapValue);
+    }
+    
+    /* throw error if the value is not an object */
+    ERROR_PROPERTYBIND(data, __value, __mapValue);
+    
+    __obj = parseAttrNameReturn(__value, __val);
+    map.valueprop = __obj[0];
+    addObjectPropertyListeners(map, data);
+    setDomByPropValueArray(map, data, __obj);
+    
+    return function(e)
+    {
+      if(e.key !== getKey(map.key))
+      {
+        /* This is a object sub property, value was already mutated on map */
+        return setDomByPropValueArray(map, data, parseAttrNameReturn(map.value));
+      }
+      
+      /* if the value is undefined we delete the style or attribute */
+      if(e.value)
+      {
+        if(typeof e.value === 'object')
+        {
+          map.value = e.value;
+          __obj = parseAttrNameReturn(map.value);
+          map.valueprop = __obj[0];
+          
+          return setDomByPropValueArray(map, data, __obj);
+        }
+        else if(typeof e.value === 'function')
+        {
+          /* Remove previous object based listeners */
+          removeObjectPropertyListeners(map, data);
+          
+          map.value = (e.value).bind(data);
+          
+          /* get any associated values to pass into the function */
+          __val = runThroughValueMaps(map, data);
+          __value = map.value(__val);
+          
+          /* throw error if the value is not an object */
+          ERROR_PROPERTYBIND(data, __value, map.value);
+          
+          __obj = parseAttrNameReturn(__value, __val);
+          map.valueprop = __obj[0];
+          
+          addObjectPropertyListeners(map, data);
+          
+          return setDomByPropValueArray(map, data, __obj);
+        }
+        else
+        {
+          /* Remove previous object based listeners */
+          removeObjectPropertyListeners(map, data);
+          
+          map.value = [e.value, ''];
+          map.valueprop = e.value;
+          
+          /* re add property listeners */
+          addObjectPropertyListeners(map, data);
+          /* update as an empty string */
+          return setDomByPropValueArray(map, data, map.value);
+        }
+      }
+      else
+      {
+        /* Remove previous object based listeners */
+        removeObjectPropertyListeners(map, data);
+        
+        return setDomByPropValueArray(map, data, undefined);
+      }
+    }
+  }
+  
+  /* This is meant for listening to changes on a attr/style property name binds data sub object properties eg: {prop:value} or [prop, value] */
+  function DataPropertyValueListener(map)
+  {
+    return function(e)
+    {
+      e.value = map.value;
+      return map.datalistener.call(this, e);
+    }
+  }
+  
+  /* This is meant for object binds such as full style objects */
+  function DataObjectListener(map, data, value)
+  {
+    return function(e)
+    {
+      
+    }
+  }
+  
+  /* this is meant for a simple non dirty dom data bind */
+  function DomListener(map, data, key, layer, dbkey)
+  {
+    var __layer = (layer || data.findLayer(map.key)),
+        __key = (dbkey || getKey(map.key));
+    
+    return function(e)
+    {
+      if(typeof e.value === 'function')
+      {
+        data.removeEventListener(map.key + 'update', map.datalistener);
+        map.node.removeEventListener((key || map.localAttr) + 'update', map.domlistener);
+        map.value = (e.value).bind(data);
+        __layer.stop()[__key] = map.value;
+        
+        /* Set new listeners */
+        map.datalistener = DataFunctionListener(map, data, key);
+        data.addEventListener(map.key, map.datalistener);
+        addInnerFunctionListeners(map, data, map.value);
+        
+        /* overwrite function */
+        map.stop()[(key || map.localAttr)] = runThroughMaps(map.mapText, data);
+        map.domlistener = DomFunctionListener(map, data, key, __layer, __key);
+        map.node.addEventListener((key || map.localAttr), map.domlistener);
+      }
+      else
+      {
+        map.value = e.value;
+        __layer.stop()[__key] = e.value;
+      }
+    }
+  }
+  
+  /* this is meant for a simple non dirty dom compute function bind */
+  function DomFunctionListener(map, data, key, layer, dbkey)
+  {
+    var __layer = (layer || data.findLayer(map.key)),
+        __key = (dbkey || getKey(map.key));
+    
+    return function(e)
+    {
+      if(typeof e.value !== 'function')
+      {
+        removeInnerFunctionListeners(map, data, map.value);
+        data.removeEventListener(map.key, map.datalistener);
+        map.node.removeEventListener((key || map.localAttr), map.domlistener);
+        
+        map.value = e.value;
+        __layer.stop()[__key] = map.value;
+        
+        map.datalistener = DataListener(map, data, key);
+        data.addEventListener(map.key + 'update', map.datalistener);
+        
+        map.domlistener = DomListener(map, data, key, __layer, __key);
+        map.node.addEventListener((key || map.localAttr), map.domlistener);
+      }
+      else
+      {
+        removeInnerFunctionListeners(map, data, map.value);
+        map.value = (e.value).bind(data);
+        __layer.stop()[__key] = map.value;
+        addInnerFunctionListeners(map, data, map.value);
+        
+        map.stop()[(key || map.localAttr)] = runThroughMaps(map.mapText, data);
+      }
+    }
+  }
+  
+  function DomEventListener(map, data, layer, dbkey)
+  {
+    var __layer = (layer || data.findLayer(map.key)),
+        __key = (dbkey || getKey(map.key));
+    
+    return function(e)
+    {
+      map.value = runThroughFilters(e.value, map.filters.vm, data.filters).bind(data);
+      __layer.stop()[__key] = map.value;
+    }
+  }
+  
+  /* ENDREGION */
+  
+  /* HELPERS FOR SETTING THE DOM */
+  /* REGION */
+  
+  /* meant for property and value pair */
+  function setDomByPropValueArray(map, data, value)
+  {
+    if(!value)
+    {
+      if(map.isInlineStyle)
+      {
+        map.stop()[map.valueprop] = '';
+      }
+      else
+      {
+        map.stop().removeAttribute(map.valueprop);
+      }
+    }
+    else
+    {
+      if(map.isInlineStyle)
+      {
+        map.stop()[value[0]] = value[1];
+      }
+      else
+      {
+        map.stop().setAttribute(value[0], value[1]);
+      }
+    }
+  }
+  
+  function setDomByObject(map, data, value)
+  {
+    
   }
   
   /* ENDREGION */
@@ -906,56 +1786,418 @@ window.kaleoi = (function(){
   /* HANDLING BINDS */
   /* REGION */
   
-  function getKey(key)
+  /* ATTR/STYLE PROPERTY NAME BINDINGS */
+  /* REGION */
+  
+  function addInnerPropertyValueListeners(map, data, property)
   {
-    return (key.split('.').pop());
+    var isEvent = (__EventList__.indexOf(property) !== -1),
+        __values = map.values,
+        __item,
+        __key,
+        __filters,
+        __hasMap = false,
+        len = __values.length,
+        x = 0;
+    
+    if(!len)
+    {
+      map.subvaluetextlistener = function(e)
+      {
+        if(typeof map.value !== 'function')
+        {
+          if(map.value.length)
+          {
+            map.value.stop()[1] = e.value;
+          }
+          else
+          {
+            var keys = Object.keys(map.value);
+            map.value.stop()[keys[0]] = e.value;
+          }
+        }
+        else
+        {
+          if(map.values.length) map.values[map.values.indexOf(e.oldValue)] = e.value;
+        }
+        e.value = map.value;
+        return map.datalistener.call(data, e);
+      }
+      map.node.addEventListener(property, map.subvaluetextlistener);
+    }
+    else
+    {
+      for(x;x<len;x++)
+      {
+        __item = __values[x];
+        if(typeof __item === 'object')
+        {
+          __hasMap = true;
+          __item.localAttr = property;
+          __item.isEvent = isEvent;
+          __key = __item.key;
+          __filters = __item.filters;
+
+          /* overwrite data with stored data if was used */
+          storageHelper(__key, __filters, data);
+
+          __item.value = data.get(__key);
+
+          /* VALUE AND TEXT INSERT */
+          __item.local[__item.localAttr] = runThroughMaps(__item.mapText, data);
+          if(typeof __item.value === 'function' && !__item.isEvent)
+          {
+            bindFunction(__item, data);
+            if(!__item.isDirty) bindDomFunction(__item, data, property);
+          }
+          else
+          {
+            bindData(__item, data);
+            if(!__item.isDirty) bindDom(__item, data, property);
+          }
+        }
+      }
+      if(!__hasMap)
+      {
+        map.subvaluetextlistener = function(e)
+        {
+          if(typeof map.value !== 'function')
+          {
+            if(map.value.length)
+            {
+              map.value.stop()[1] = e.value;
+            }
+            else
+            {
+              var keys = Object.keys(map.value);
+              map.value.stop()[keys[0]] = e.value;
+            }
+          }
+          else
+          {
+            if(map.values.length) map.values[map.values.indexOf(e.oldValue)] = e.value;
+          }
+          e.value = map.value;
+          return map.datalistener.call(data, e);
+        }
+        map.node.addEventListener(property, map.subvaluetextlistener);
+      }
+    }
   }
   
-  /* TODO: fix to watch inner function props */
-  function bindFunction(map, data)
+  function removeInnerPropertyValueListeners(map, data, property)
+  {
+    var __values = map.values,
+        __item,
+        len = __values.length,
+        x = 0;
+    for(x;x<len;x++)
+    {
+      __item = __values[x];
+      if(typeof __item === 'object')
+      {
+        if(typeof __item.value === 'function' && !__item.isEvent)
+        {
+          removeBindFunction(__item, data);
+          if(!__item.isDirty) removeBindDomFunction(__item, data, __item.localAttr);
+        }
+        else
+        {
+          removeBindData(__item, data);
+          if(!__item.isDirty) removeBindDom(__item, data, __item.localAttr);
+        }
+      }
+    }
+    
+    if(map.subvaluetextlistener)
+    {
+      map.node.removeEventListener(property, map.subvaluetextlistener);
+    }
+  }
+  
+  function bindProperty(map, data)
+  {
+    var __layer = data.findLayer(map.key),
+        __key = getKey(map.key),
+        __value = (__layer && __layer[__key]),
+        __local = ((map.local && map.local.stop) ? map.local : ({ stop: function(){
+          map.node.stop();
+          return map.local;
+        }})),
+        __val = runThroughValueMaps(map, data),
+        __isFunc = (typeof __value === 'function'),
+        __item = parseAttrNameReturn(__isFunc ? map.value(__val) : map.value, __val);
+    
+    function listener(e)
+    {
+      removeBindProperty(map, data);
+      map.value = e.value;
+      __val = runThroughValueMaps(map, data);
+      __item = parseAttrNameReturn((typeof map.value === 'function') ? map.value(__val) : map.value, __val);
+      if(map.isInlineStyle)
+      {
+        __local.stop()[__item[0]] = __item[1];
+      }
+      else
+      {
+        map.node.stop().setAttribute(__item[0], __item[1]);
+      }
+      bindProperty(map, data);
+    }
+    
+    function sublistener(e)
+    {
+      e.value = map.value;
+      return map.datalistener.call(this, e);
+    }
+    
+    if(__isFunc)
+    {
+      map.funclistener = listener
+      map.datalistener = listener
+      __layer.addEventListener(__key,map.funclistener);
+      addInnerFunctionListeners(map, data, map.value);
+    }
+    else
+    {
+      map.datalistener = listener
+      __layer.addEventListener(__key+'update',map.datalistener);
+      if(typeof __layer[__key] === 'object')
+      {
+        map.sublistener = sublistener;
+        __layer[__key].addEventListener('*update', map.sublistener);
+      }
+    }
+    addInnerPropertyValueListeners(map, data, __item[0]);
+  }
+  
+  function removeBindProperty(map, data)
+  {
+    var __layer = data.findLayer(map.key),
+        __key = getKey(map.key),
+        __value = (__layer && __layer[__key]),
+        __val = runThroughValueMaps(map, data),
+        __isFunc = (typeof __value === 'function'),
+        __item = parseAttrNameReturn(__isFunc ? map.value(__val) : map.value, __val);
+    
+    removeInnerPropertyValueListeners(map, data, __item[0]);
+    if(__isFunc)
+    {
+      removeInnerFunctionListeners(map, data, map.value);
+      __layer.removeEventListener(__key, map.funclistener);
+    }
+    else
+    {
+      __layer.removeEventListener(__key+'update', map.datalistener);
+      if(typeof __layer[__key] === 'object') __layer[__key].removeEventListener('*update', map.sublistener);
+    }
+    
+    if(map.isInlineStyle)
+    {
+      map.local[__item[0]] = '';
+    }
+    else
+    {
+      map.node.removeAttribute(__item[0]);
+    }
+  }
+  
+  /* ENDREGION */
+  
+  /* FUNCTION BINDS */
+  /* REGION */
+  
+  function bindFunction(map, data, key)
+  {
+    var __layer = data.findLayer(map.key),
+        __key = getKey(map.key),
+        __value = (__layer && __layer[__key]),
+        __local = ((map.local && map.local.stop) ? map.local : ({ stop: function(){
+          map.node.stop();
+          return map.local;
+        } }));
+    
+    map.funclistener = function(e)
+    {
+      /* if the value changes to a standard, then this bind is no longer computed */
+      if(typeof e.value !== 'function')
+      {
+        /* remove binds */
+        if(!map.isDirty) removeBindDomFunction(map, data, key);
+        removeBindFunction(map, data);
+        
+        map.value = e.value;
+        
+        /* change to non computed */
+        bindData(map, data, key);
+        if(!map.isDirty) bindDom(map, data, key);
+        
+        /* refresh values */
+        __local.stop()[(key || map.localAttr)] = runThroughMaps(map.mapText, data);
+      }
+      else
+      {
+        removeInnerFunctionListeners(map, data, map.value);
+        addInnerFunctionListeners(map, data, e.value);
+        map.value = e.value.bind(data);
+        __local.stop()[(map.localAttr || key)] = runThroughMaps(map.mapText, data);
+      }
+    }
+    
+    map.datalistener = function()
+    {
+      __local.stop()[(key || map.localAttr)] = runThroughMaps(map.mapText, data);
+    }
+    
+    __layer.addEventListener(__key,map.funclistener);
+    addInnerFunctionListeners(map, data, map.value);
+  }
+  
+  function removeBindFunction(map, data)
   {
     var __layer = data.findLayer(map.key),
         __key = getKey(map.key);
     
-    map.funclistener = function(e)
+    __layer.removeEventListener(__key,map.funclistener);
+    removeInnerFunctionListeners(map, data, map.value);
+  }
+  
+  function bindDomFunction(map, data, key)
+  {
+    map.domlistener = function(e)
     {
+      /* if the value changes to a standard, then this bind is no longer computed */
       if(typeof e.value !== 'function')
       {
+        /* remove binds */
+        removeBindDomFunction(map, data, key);
+        removeBindFunction(map, data);
+        
+        data.stop().set(map.key, runThroughFilters(e.value, map.filters.vmFilters, data.filters));
+        map.value = data.get(map.key);
+        
+        /* change to non computed */
+        bindData(map, data, key);
+        bindDom(map, data, key);
+      }
+      else
+      {
         e.preventDefault();
-        map.funcValue = e.value;
-        (map.local.stop ? map.local.stop() : map.local)[map.localAttr] = runThroughMaps(map.mapText, data);
+        removeInnerFunctionListeners(map, data, map.value);
+        addInnerFunctionListeners(map, data, e.value);
+        map.value = e.value.bind(data);
+        data.stop().set(map.key, runThroughFilters(e.value, map.filters.vmFilters, data.filters));
       }
     }
     
-    /* TODO: fix to watch inner function props */
-    map.datalistener = function(e)
-    {
-      (map.local.stop ? map.local.stop() : map.local)[map.localAttr] = runThroughMaps(map.mapText, data);
-    }
-    
-    if(!__layer || !__layer[__key]) return (!!console.error('Component: ' + data.name, new Error('You are missing the binding property of ' + __key)));
-    
-    __layer.addEventListener(__key,map.funclistener);
+    map.node.addEventListener((key || map.listener), map.domlistener);
   }
   
-  function bindData(key, map, data)
+  function removeBindDomFunction(map, data, key)
   {
+    map.node.removeEventListener((key || map.listener), map.domlistener);
+  }
+  
+  /* ENDREGION */
+  
+  /* STANDARD PROPERTY BINDS */
+  /* REGION */
+  
+  function bindData(map, data, key)
+  {
+    var __layer = data.findLayer(map.key),
+        __key = getKey(map.key),
+        __local = ((map.local && map.local.stop) ? map.local : ({ stop: function(){ 
+          map.node.stop();
+          return map.local;
+        } }));
+    
     map.datalistener = function(e)
     {
-      map.value = e.value;
-      (map.local.stop ? map.local.stop() : map.local)[map.localAttr] = (map.type === 'event' ? map.value : runThroughMaps(map.mapText, data));
+      /* If value was set as a function then we need to change this to a computed bind */
+      if(typeof e.value === 'function' && !map.isEvent)
+      {
+        if(!map.isDirty) removeBindDom(map, data, key);
+        removeBindData(map, data, key);
+        
+        map.value = e.value.bind(data);
+        
+        /* change to computed */
+        bindFunction(map, data, key);
+        bindDomFunction(map, data, key);
+        
+        __local.stop()[(key || map.localAttr)] = runThroughMaps(map.mapText, data);
+      }
+      else
+      {
+        map.value = e.value;
+        __local.stop()[(key || map.localAttr)] = (map.type === 'event' ? map.value : runThroughMaps(map.mapText, data));
+      }
     }
-    
-    var __layer = data.findLayer(key),
-        __key = getKey(key);
-    
-    if(!__layer || !__layer[__key]) return (!!console.error('Component: ' + data.name, new Error('You are missing the binding property of ' + __key)));
     
     __layer.addEventListener(__key + "update",map.datalistener);
+    if(__layer[__key] && typeof __layer[__key] === 'object')
+    {
+      map.sublistener = function(e)
+      {
+        e.value = map.value;
+        return map.datalistener.call(this, e);
+      }
+      
+      __layer[__key].addEventListener('*update', map.sublistener);
+    }
   }
   
-  /* TODO: fix to watch inner function props */
-  function bindStylesheetData(key, map, data)
+  function removeBindData(map, data)
+  {
+    var __layer = data.findLayer(map.key),
+        __key = getKey(map.key);
+    
+    __layer.removeEventListener(__key + "update",map.datalistener);
+  }
+  
+  function bindDom(map, data, key)
+  {
+    var __local = ((map.local && map.local.stop) ? map.local : { stop: function(){ return map.local } });
+    
+    map.domlistener = function(e)
+    {
+      /* If value was set as a function then we need to change this to a computed bind */
+      if(typeof e.value === 'function' && !map.isEvent)
+      {
+        /* remove old binds */
+        e.preventDefault();
+        removeBindDom(map, data, key);
+        removeBindData(map, data, key);
+        data.stop().set(map.key, runThroughFilters(map.value, map.filters.vmFilters, data.filters));
+        map.value = data.get(map.key).bind(data);
+        
+        /* change to computed */
+        bindFunction(map, data, key);
+        bindDomFunction(map, data, key);
+        
+        /* refresh values */
+        __local.stop()[(map.localAttr || key)] = runThroughMaps(map.mapText, data);
+      }
+      else
+      {
+        map.value = e.value;
+        data.stop().set(map.key, runThroughFilters(e.value, map.filters.vmFilters, data.filters));
+      }
+    }
+    
+    map.node.addEventListener((key || map.listener), map.domlistener);
+  }
+  
+  function removeBindDom(map, data, key)
+  {
+    map.node.removeEventListener((key || map.listener), map.domlistener);
+  }
+  
+  /* ENDREGION */
+  
+  /* TODO: convert properties on object to '-' format */
+  function bindValuesData(key, map, data)
   {
     var localmap,
         len = map.values.length,
@@ -973,39 +2215,10 @@ window.kaleoi = (function(){
         }
         else
         {
-          bindData(localmap.key, localmap, data);
+          bindData(localmap, data);
         }
       }
     }
-  }
-  
-  function removeBindData(key, map, data)
-  {
-    data.findLayer(key).removeEventListener(getKey(key) + "update", map.datalistener);
-  }
-  
-  function bindDom(key, map, data)
-  {
-    map.domListener = function(e)
-    {
-      if(typeof map.value === 'function' && !map.isEvent && typeof e.value !== 'function')
-      {
-        map.funcValue = e.value;
-        (map.local.stop ? map.local.stop() : map.local)[map.localAttr] = runThroughMaps(map.mapText, data);
-      }
-      else
-      {
-        map.value = e.value;
-        data.stop().set(key, runThroughFilters(e.value, map.filters.vmFilters, data.filters));
-      }
-    }
-    
-    map.node.addEventListener(map.listener + "update", map.domListener);
-  }
-  
-  function removeBindDom(key, map)
-  {
-    map.node.removeEventListener(map.listener + "update", map.domListener);
   }
   
   /* ENDREGION */

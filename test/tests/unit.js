@@ -85,7 +85,8 @@ function BuildUnitTests()
         vm.test = 'another test';
         
         expect(func.innerHTML).to.equal('another test');
-        expect(cb.callCount).to.equal(2); //first time is when the function was overwrote
+        expect(vm.test).to.equal('another test');
+        expect(cb.callCount).to.equal(1); //when the function was overwrote
         kaleoi.removeComponent(component);
         done();
       })
@@ -107,7 +108,8 @@ function BuildUnitTests()
         func.innerHTML = 'test_something'
         
         expect(func.innerHTML).to.equal('test_something');
-        expect(cb.callCount).to.equal(2); //first time is when the function was overwrote
+        expect(vm.test).to.equal('test_something');
+        expect(cb.callCount).to.equal(1); //when the function was overwrote
         kaleoi.removeComponent(component);
         done();
       })
@@ -315,7 +317,7 @@ function BuildUnitTests()
       kaleoi.createComponent(createComponent('stylesheet'))
       .then(function(){ return kaleoi.createComponent(createComponent('stylesheet')); })
       .then(function(componentA, componentB){
-        componentA.__KaleoiExtensions__.vm.decoration = 'line-through';
+        componentA.__KaleoiExtensions__.vm.decoration = { 'text-decoration': 'line-through' };
         expect(getComputedStyle(componentA).textDecoration).to.equal('line-through solid rgb(0, 0, 0)');
         expect(getComputedStyle(componentB).textDecoration).to.equal('line-through solid rgb(0, 0, 0)');
         kaleoi.removeComponent(componentA);
@@ -323,7 +325,6 @@ function BuildUnitTests()
         done();
       })
     })
-    
   });
   
   describe('Stylesheet Local', function(){
@@ -459,7 +460,7 @@ function BuildUnitTests()
       kaleoi.createComponent(createComponent('stylesheet'))
       .then(function(){ return kaleoi.createComponent(createComponent('stylesheet')); })
       .then(function(componentA, componentB){
-        componentA.__KaleoiExtensions__.vm.decoration = 'line-through';
+        componentA.__KaleoiExtensions__.vm.decoration = { 'text-decoration': 'line-through' };
         expect(getComputedStyle(componentA.children[0]).textDecoration).to.equal('line-through solid rgb(0, 0, 0)');
         expect(getComputedStyle(componentB.children[0]).textDecoration).to.not.equal('line-through solid rgb(0, 0, 0)');
         kaleoi.removeComponent(componentA);
@@ -473,9 +474,9 @@ function BuildUnitTests()
     it('Should properly insert an entire inline style', function(done){
       kaleoi.createComponent(createComponent('style'))
       .then(function(component){
-        expect(component.children[1].style.background).to.equal('#FFFFFF');
-        component.__KaleoiExtensions__.vm.insertStyle = { background: '#000000' }
-        expect(component.children[1].style.font).to.equal('#FFFFFF');
+        expect(component.children[1].style.background).to.equal('rgb(255, 255, 255)');
+        component.__KaleoiExtensions__.vm.insertStyle = { background: 'rgb(0, 0, 0)' }
+        expect(component.children[1].style.background).to.equal('rgb(255, 255, 255)');
         kaleoi.removeComponent(component);
         done();
       })
@@ -483,20 +484,73 @@ function BuildUnitTests()
     it('Should properly set an entire inline style (object)', function(done){
       kaleoi.createComponent(createComponent('style'))
       .then(function(component){
-        expect(component.style.font).to.equal('san serif');
-        component.__KaleoiExtensions__.vm.style = { font: 'Open Sans' }
-        expect(component.style.font).to.equal('Open Sans');
+        expect(component.style.fontFamily).to.equal('"sans serif"');
+        component.__KaleoiExtensions__.vm.style = { fontFamily: 'Open Sans' }
+        /* Font family is really wierd */
+        expect(component.style.fontFamily).to.equal('Open Sans');
+        
+        component.__KaleoiExtensions__.vm.style.fontFamily = 'sans serif';
+        expect(component.style.fontFamily).to.equal('sans serif');
+        kaleoi.removeComponent(component);
+        done();
+      })
+    })
+    it('Should properly set an entire inline style (function)', function(done){
+      kaleoi.createComponent(createComponent('style'))
+      .then(function(component){
+        expect(component.children[0].style.fontSize).to.equal('24px');
+        component.__KaleoiExtensions__.vm.computeStyle = { fontSize: '30px' }
+        expect(component.children[0].style.fontSize).to.equal('30px');
         kaleoi.removeComponent(component);
         done();
       })
     })
     
-    it('Should properly set an entire inline style (function)', function(done){
+    it('Should properly set a style property value', function(done){
       kaleoi.createComponent(createComponent('style'))
       .then(function(component){
-        expect(component.children[0].style.fontSize).to.equal('24px');
-        component.__KaleoiExtensions__.vm.fontSize = '30px'
-        expect(component.children[0].style.fontSize).to.equal('30px');
+        expect(component.children[2].style.marginTop).to.equal('30px');
+        component.__KaleoiExtensions__.vm.marginTop = '40px';
+        expect(component.children[2].style.marginTop).to.equal('40px');
+        done();
+      })
+    })
+    
+    it('Should properly set a style property name', function(done){
+      kaleoi.createComponent(createComponent('style'))
+      .then(function(component){
+        expect(component.children[2].style.marginRight).to.equal('20px');
+        component.__KaleoiExtensions__.vm.marginRight = 'marginTop';
+        expect(component.children[2].style.marginTop).to.equal('20px');
+        expect(component.children[2].style.marginRight).to.equal('');
+        done();
+      })
+    })
+    
+    it('Should properly set a style property name and value', function(done){
+      kaleoi.createComponent(createComponent('style'))
+      .then(function(component){
+        expect(component.children[2].style.paddingRight).to.equal('20px');
+        component.__KaleoiExtensions__.vm.pR = '30px';
+        expect(component.children[2].style.paddingRight).to.equal('30px');
+        component.children[2].style.paddingRight = '40px';
+        expect(component.__KaleoiExtensions__.vm.pR).to.equal('40px');
+        component.__KaleoiExtensions__.vm.paddingRight = 'paddingLeft';
+        expect(component.children[2].style.paddingLeft).to.equal('40px');
+        expect(component.children[2].style.paddingRight).to.equal('');
+        kaleoi.removeComponent(component);
+        done();
+      })
+    })
+    
+    it('Should properly set a full style property', function(done){
+      kaleoi.createComponent(createComponent('style'))
+      .then(function(component){
+        expect(component.children[2].style.paddingTop).to.equal('50px');
+        component.__KaleoiExtensions__.vm.paddingTop[1] = '30px';
+        expect(component.children[2].style.paddingTop).to.equal('30px');
+        component.children[2].style.paddingTop = '40px';
+        expect(component.__KaleoiExtensions__.vm.paddingTop[1]).to.equal('40px');
         kaleoi.removeComponent(component);
         done();
       })

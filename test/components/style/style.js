@@ -1,17 +1,26 @@
 function style()
 {
-  this.insertStyle = {
-    background: '#FFFFFF'
-  }
+  this.set('insertStyle', {
+    background: 'rgb(255, 255, 255)'
+  });
   
-  this.style = {
-    font: 'sans serif'
-  }
+  this.set('style', {
+    fontFamily: 'sans serif'
+  });
   
-  this.computeStyle = function(v)
+  this.computeStyle = function()
   {
     return {
-      fontSize: (v || '24px')
+      fontSize: '24px'
     }
   }
+  
+  this.paddingRight = 'paddingRight';
+  this.pR = '20px';
+  
+  this.marginRight = 'marginRight';
+  
+  this.marginTop = '30px';
+  
+  this.set('paddingTop', ['paddingTop', '50px']);
 }

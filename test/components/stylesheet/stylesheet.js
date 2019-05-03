@@ -2,15 +2,15 @@ function stylesheet()
 {
   this.color = '#000';
   
-  this.fontSize = function(v)
+  this.fontSize = function()
   {
-    return (v || 16);
+    return 16;
   }
   
   this.fontWeight = { 'font-weight': '600' };
-  this.decoration = function(v)
+  this.decoration = function()
   {
-    return { 'text-decoration': (v || 'underline') };
+    return { 'text-decoration': 'underline' };
   }
   
   this.marginTop = 'margin-top';
@@ -19,11 +19,11 @@ function stylesheet()
   this.marginLeft = 'margin-left';
   
   this.mB = '20px';
-  this.mR = function(v){
-    return (v || '24px');
+  this.mR = function(){
+    return '24px';
   };
-  this.mL = function(v){
-    return (v || 18);
+  this.mL = function(){
+    return 18;
   }
   
   this.computePaddingTop = function()
