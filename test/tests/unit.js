@@ -186,6 +186,9 @@ function BuildUnitTests()
     })
   });
   
+  /* stylesheet maps not being removed, new ones being created but old ones still there and do not match, cause sync issues,
+     global stylesheet should not contain a component-id or node-id, only component namem 
+  */
   describe('Stylesheet Global', function(){
     it('Should properly insert a style bind', function(done){
       kaleoi.createComponent(createComponent('stylesheet'))
@@ -225,7 +228,7 @@ function BuildUnitTests()
       })
     })
     
-    it('Should properly set a function input if the vm property is set', function(done){
+    it('Should properly replace a function input if the vm property is set', function(done){
       kaleoi.createComponent(createComponent('stylesheet'))
       .then(function(){ return kaleoi.createComponent(createComponent('stylesheet')); })
       .then(function(componentA, componentB){
@@ -317,7 +320,7 @@ function BuildUnitTests()
       kaleoi.createComponent(createComponent('stylesheet'))
       .then(function(){ return kaleoi.createComponent(createComponent('stylesheet')); })
       .then(function(componentA, componentB){
-        componentA.__KaleoiExtensions__.vm.decoration = { 'text-decoration': 'line-through' };
+        componentA.__KaleoiExtensions__.vm.set('decoration', { 'text-decoration': 'line-through' });
         expect(getComputedStyle(componentA).textDecoration).to.equal('line-through solid rgb(0, 0, 0)');
         expect(getComputedStyle(componentB).textDecoration).to.equal('line-through solid rgb(0, 0, 0)');
         kaleoi.removeComponent(componentA);

@@ -332,23 +332,6 @@ window.kaleoi = (function(){
     return __obj;
   }
   
-  function parseAttrNameReturn(val, values, oldValue)
-  {
-    if(typeof val === 'string') return [val, values, oldValue];
-    if(val.length)
-    {
-      if(val.length === 1) return val.slice().concat([values, oldValue]);
-      if(val.length === 2) return val.slice().concat(oldValue);
-      return val.slice();
-    }
-    if(typeof val === 'object')
-    {
-      var keys = Object.keys(val);
-      return [keys[0], (val[keys[0]] || values), oldValue];
-    }
-    return [];
-  }
-  
   function getFunctionVariables(func)
   {
     var funcString = func.toString(),
@@ -673,7 +656,7 @@ window.kaleoi = (function(){
   
   function removeComponent(component)
   {
-    // component.__CzosnekRoot__.destruct();
+    component.__CzosnekRoot__.destruct();
     component.parentElement.removeChild(component);
   }
   
@@ -733,34 +716,74 @@ window.kaleoi = (function(){
     
     map.value = data.get(map.key);
     
+    if(map.mapValues && map.mapValues.length)
+    {
+      var len = map.mapValues.length,
+          x = 0;
+      for(x;x<len;x++)
+      {
+        handleMaps(map.mapValues[x], data);
+      }
+    }
+    
     if(!map.value) return (!!console.error('Component: ' + data.name, new Error('You are missing the viewmodel property of ' + map.key)));
     
     if(typeof map.value === 'function') map.value = map.value.bind(data);
-    
+    if(typeof map.value === 'object') map.value = copy(map.value, {});
     /* set stop bind method, (stops updates to prevent stack overflow) */
     map.stop = ((map.local && map.local.stop) ? map.local.stop.bind(map.local) : map.node.stop.bind(map.node));
     
-    switch(mapType)
+    if(!map.isPropertyValue)
     {
-      case 0:
-        return handleStandard(map, data);
-      case 1:
-        return handleEvent(map, data);
-      case 2:
-        return handleStyleSheet(map, data);
-      case 3:
-        return handleStyle(map, data);
-      case 4:
-        return handleAttr(map, data);
-      case 5:
-        return handleLoop(map, data);
-      case 6:
-        return handleNode(map, data);
-      case 7:
-        return handlePointer(map, data);
+      switch(mapType)
+      {
+        case 0:
+          return handleStandard(map, data);
+        case 1:
+          return handleEvent(map, data);
+        case 2:
+          return handleStyleSheet(map, data);
+        case 3:
+          return handleStyle(map, data);
+        case 4:
+          return handleAttr(map, data);
+        case 5:
+          return handleLoop(map, data);
+        case 6:
+          return handleNode(map, data);
+        case 7:
+          return handlePointer(map, data);
+      } 
     }
   }
   
+  function parseAttrNameValue(val, data, attrValue, next)
+  {
+    if(typeof val === 'string')
+    {
+      if(val.indexOf(':') !== -1) return val;
+      if(attrValue) return val + ':' + attrValue + (next && next.indexOf(';') !== -1 ? '' : ';');
+    }
+    else if(val && typeof val === 'object')
+    {
+      var __key = Object.keys(val)[0];
+      if(attrValue !== undefined)
+      {
+        if(val.length) return val[0] + ':' + attrValue + (next && next.indexOf(';') !== -1 ? '' : ';');
+        if(__key) return __key + ':' + attrValue + (next && next.indexOf(';') !== -1 ? '' : ';');
+      }
+      else
+      {
+        if(val.length === 2) return val[0] + ':' + val[1] + (next && next.indexOf(';') !== -1 ? '' : ';');
+        if(__key) return __key + ':' + val[__key] + (next && next.indexOf(';') !== -1 ? '' : ';');
+      }
+    }
+    return ERROR_PROPERTYBIND(data, val, parseAttrNameValue);
+  }
+  
+  /* SPECIAL CASE LISTENERS */
+  
+  /* PROPERTIES INSIDE COMPUTE FUNCTIONS */
   /* adds the listeners for properties that were used in compute functions */
   function addInnerFunctionListeners(map, data, func)
   {
@@ -769,11 +792,14 @@ window.kaleoi = (function(){
         __inner = getFunctionVariables(func),
         len = __inner.length,
         x = 0;
+    
+    if(!map.subfunctionlistener) map.subfunctionlistener = subFunctionListener(map, data);
+    
     for(x;x<len;x++)
     {
       __layer = data.findLayer(__inner[x]);
       __key = getKey(__inner[x])
-      __layer.addEventListener(__key,map.datalistener);
+      __layer.addEventListener(__key,map.subfunctionlistener);
     }
   }
   
@@ -793,7 +819,83 @@ window.kaleoi = (function(){
     }
   }
   
+  function subFunctionListener(map, data)
+  {
+    return function subFunctionListener(e)
+    {
+      e.value = map.value;
+      return map.datafunctionlistener.call(data, e);
+    }
+  }
+  
+  /* PROPERTIES INSIDE OBJECTS */
+  
+  function addSubDataListeners(map, data, layer, dbkey)
+  {
+    var __obj = layer[dbkey],
+        __keys = Object.keys(__obj),
+        x = 0,
+        len = __keys.length;
+    
+    if(!map.subdatalistener) map.subdatalistener = subDataListener(map, data);
+    
+    for(x;x<len;x++)
+    {
+      __obj.addEventListener(__keys[x], map.subdatalistener);
+    }
+  }
+  
+  function removeSubDataListeners(map, data, layer, dbkey)
+  {
+    var __obj = layer[dbkey],
+        __keys = Object.keys(__obj),
+        x = 0,
+        len = __keys.length;
+    
+    for(x;x<len;x++)
+    {
+      __obj.removeEventListener(__keys[x], map.subdatalistener);
+    }
+  }
+  
+  function subDataListener(map, data)
+  {
+    return function subDataListener(e)
+    {
+      e.value = map.value;
+      e.subchange = true;
+      return map[(typeof map.value === 'function' ? 'datafunctionlistener' : 'datalistener')].call(data, e);
+    }
+  }
+  
   /* STANDARD */
+  /* REGION */
+  function handleStandard(map, data)
+  {
+    var __layer = data.findLayer(map.key),
+        __key = getKey(map.key);
+    
+    map.local[map.localAttr] = loopStandardValue(map.mapText, data);
+    if(!map.isInsert)
+    {
+      map.datalistener = standardDataListener(map, data, __layer, __key);
+      map.datafunctionlistener = standardFunctionDataListener(map, data, __layer, __key);
+      map.domlistener = standardDomListener(map, data, __layer, __key);
+      map.domfunctionlistener = standardFunctionDomListener(map, data, __layer, __key);
+      
+      if(typeof map.value === 'function')
+      {
+        __layer.addEventListener(__key, map.datafunctionlistener);
+        if(!map.isDirty) map.node.addEventListener(map.listener, map.domfunctionlistener);
+      }
+      else
+      {
+        __layer.addEventListener(__key, map.datalistener);
+        if(!map.isDirty) map.node.addEventListener(map.listener, map.domlistener);
+      }
+    }
+  }
+  
   function loopStandardValue(mapText, data)
   {
     var __text = '',
@@ -821,32 +923,6 @@ window.kaleoi = (function(){
       }
     }
     return __text;
-  }
-  
-  function handleStandard(map, data)
-  {
-    var __layer = data.findLayer(map.key),
-        __key = getKey(map.key);
-    
-    map.local[map.localAttr] = loopStandardValue(map.mapText, data);
-    if(!map.isInsert)
-    {
-      map.datalistener = standardDataListener(map, data, __layer, __key);
-      map.datafunctionlistener = standardFunctionDataListener(map, data, __layer, __key);
-      map.domlistener = standardDomListener(map, data, __layer, __key);
-      map.domfunctionlistener = standardFunctionDomListener(map, data, __layer, __key);
-      
-      if(typeof map.value === 'function')
-      {
-        __layer.addEventListener(__key, map.datafunctionlistener);
-        if(!map.isDirty) map.node.addEventListener(map.listener, map.domfunctionlistener);
-      }
-      else
-      {
-        __layer.addEventListener(__key, map.datalistener);
-        if(!map.isDirty) map.node.addEventListener(map.listener, map.domlistener);
-      }
-    }
   }
   
   function standardDataListener(map, data, layer, dbkey)
@@ -993,8 +1069,10 @@ window.kaleoi = (function(){
       }
     }
   }
+  /* ENDREGION */
   
   /* EVENT */
+  /* REGION */
   function handleEvent(map, data)
   {
     var __layer = data.findLayer(map.key),
@@ -1049,11 +1127,415 @@ window.kaleoi = (function(){
       }
     }
   }
+  /* ENDREGION */
   
   /* STYLESHEET */
+  /* stylesheet has 4 types, full style, full prop style, prop name, string (eg. anywhere other than the above) */
   function handleStyleSheet(map, data)
   {
+    var __layer = data.findLayer(map.key),
+        __key = getKey(map.key);
     
+    map.local[map.localAttr] = loopStylesheetValue(map.mapText, data);
+    if(!map.isInsert)
+    {
+      if(map.isFullStyle)
+      {
+        map.datalistener = stylesheetDataFullStyleListener(map, data, __layer, __key);
+        map.datafunctionlistener = stylesheetFunctionDataFullStyleListener(map, data, __layer, __key);
+        if(typeof map.value !== 'function') addSubDataListeners(map, data, __layer, __key);
+      }
+      else if(map.isFullProp)
+      {
+        map.datalistener = styelsheetDataFullPropListener(map, data, __layer, __key);
+        map.datafunctionlistener = styelsheetFunctionDataFullPropListener(map, data, __layer, __key);
+        if(typeof map.value !== 'function') addSubDataListeners(map, data, __layer, __key);
+      }
+      else if(map.isProperty)
+      {
+        map.datalistener = stylesheetDataPropListener(map, data, __layer, __key);
+        map.datafunctionlistener = stylesheetFunctionDataPropListener(map, data, __layer, __key);
+      }
+      else
+      {
+        map.datalistener = stylesheetDataListener(map, data, __layer, __key);
+        map.datafunctionlistener = stylesheetFunctionDataListener(map, data, __layer, __key);
+      }
+      
+      if(typeof map.value === 'function')
+      {
+        __layer.addEventListener(__key, map.datafunctionlistener);
+      }
+      else
+      {
+        __layer.addEventListener(__key + 'update', map.datalistener);
+      }
+    }
+  }
+  
+  /* this loops over property name binds associated values */
+  function loopStyleSheetAttributeValues(mapText, data)
+  {
+    var __text = '',
+        __map,
+        __val,
+        __dataFilters = data.filters,
+        x = 0,
+        len = mapText.length;
+    for(x;x<len;x++)
+    {
+      __map = mapText[x];
+      if(typeof __map === 'string')
+      {
+        __text += __map;
+      }
+      else
+      {
+        __val = runThroughFilters(typeof __map.value === 'function' ? __map.value() : __map.value, __map.filters.filters, __dataFilters);
+        __text += __val;
+        if(__map.isInsert)
+        {
+          __map.mapText[x] = __val;
+          __map.maps[__map.mapIndex] = __val;
+        }
+      }
+    }
+    return __text;
+  }
+  
+  /* Hey doofus, it seems the styles are being set with two semi colons and [Object object] */
+  /* This loops all the stylesheet binds */
+  function loopStylesheetValue(mapText, data)
+  {
+    var __text = '',
+        __map,
+        __val,
+        __dataFilters = data.filters,
+        x = 0,
+        len = mapText.length;
+    for(x;x<len;x++)
+    {
+      __map = mapText[x];
+      if(typeof __map === 'string')
+      {
+        __text += __map;
+      }
+      else if(__map.value)
+      {
+        /* full map style */
+        if(__map.isFullStyle)
+        {
+          __val = runThroughFilters(typeof __map.value === 'function' ? __map.value() : __map.value, __map.filters.filters, __dataFilters);
+
+          if(!__val || typeof __val !== 'object') return ERROR_PROPERTYBIND(data, __val, loopStylesheetValue);
+
+          __val = JSON.stringify(__val, null, 2).replace(/[{}"]/g, '');
+          __text += __val;
+          if(__map.isInsert)
+          {
+            __map.mapText[x] = __val;
+            __map.maps[__map.mapIndex] = __val;
+          }
+        }
+        /* full property style */
+        else if(__map.isFullProp)
+        {
+          __val = runThroughFilters(typeof __map.value === 'function' ? __map.value() : __map.value, __map.filters.filters, __dataFilters);
+          __val = parseAttrNameValue(__val, data, undefined, mapText[(x + 1)]);
+          __text += (__val || '');
+          if(__map.isInsert)
+          {
+            __map.mapText[x] = __val;
+            __map.maps[__map.mapIndex] = __val;
+          }
+        }
+        /* style property name */
+        else if(__map.isProperty)
+        {
+          var __attrValue = loopStyleSheetAttributeValues(__map.values, data);
+
+          __val = runThroughFilters(typeof __map.value === 'function' ? __map.value(__attrValue) : __map.value, __map.filters.filters, __dataFilters);
+          __val = parseAttrNameValue(__val, data, __attrValue, mapText[(x + 1)]);
+          __text += (__val || '');
+          if(__map.isInsert)
+          {
+            __map.mapText[x] = __val;
+            __map.maps[__map.mapIndex] = __val;
+          }
+        }
+        /* standard string */
+        else
+        {
+          __val = runThroughFilters(typeof __map.value === 'function' ? __map.value() : __map.value, __map.filters.filters, __dataFilters);
+          __text += __val;
+          if(__map.isInsert)
+          {
+            __map.mapText[x] = __val;
+            __map.maps[__map.mapIndex] = __val;
+          }
+        }
+      }
+    }
+    return __text;
+  }
+  
+  function stylesheetDataListener(map, data, layer, dbkey)
+  {
+    return function stylesheetDataListener(e)
+    {
+      if(typeof e.value === 'function')
+      {
+        /* Remove old listeners */
+        layer.removeEventListener(dbkey + 'update', map.datalistener);
+        
+        /* bind function to the viewmodel */
+        map.value = (e.value).bind(data);
+        
+        /* Add the new data listeners */
+        layer.addEventListener(dbkey, map.datafunctionlistener);
+        addInnerFunctionListeners(map, data, map.value);
+        
+        /* Set the dom property */
+        map.stop()[map.localAttr] = loopStylesheetValue(map.mapText, data);
+      }
+      else
+      {
+        map.value = e.value;
+        map.stop()[map.localAttr] = loopStylesheetValue(map.mapText, data);
+      }
+    }
+  }
+  
+  function stylesheetFunctionDataListener(map, data, layer, dbkey)
+  {
+    return function stylesheetFunctionDataListener(e)
+    {
+      if(typeof e.value !== 'function')
+      {
+        /* Remove listeners */
+        removeInnerFunctionListeners(map, data, map.value);
+        layer.removeEventListener(dbkey, map.datafunctionlistener);
+        
+        /* Add new data listeners */
+        layer.addEventListener(dbkey + 'update', map.datalistener);
+        
+        /* set the dom property */
+        map.value = e.value;
+        map.stop()[map.localAttr] = loopStandardValue(map.mapText, data);
+      }
+      else
+      {
+        /* Remove inner listeners */
+        removeInnerFunctionListeners(map, data, map.value);
+        
+        /* bind the new function to the viewmodel */
+        map.value = (e.value).bind(data);
+        
+        /* add new inner listeners */
+        addInnerFunctionListeners(map, data, map.value);
+        
+        /* set the dom property */
+        map.stop()[map.localAttr] = loopStandardValue(map.mapText, data);
+      }
+    }
+  }
+  
+  function stylesheetDataFullStyleListener(map, data, layer, dbkey)
+  {
+    return function stylesheetDataFullStyleListener(e)
+    {
+      if(typeof e.value === 'function')
+      {
+        /* Remove old listeners */
+        layer.removeEventListener(dbkey + 'update', map.datalistener);
+        removeSubDataListeners(map, data, layer, dbkey);
+        
+        /* bind function to the viewmodel */
+        map.value = (e.value).bind(data);
+        
+        /* Add the new data listeners */
+        layer.addEventListener(dbkey, map.datafunctionlistener);
+        addInnerFunctionListeners(map, data, map.value);
+        
+        /* Set the dom property */
+        map.stop()[map.localAttr] = loopStylesheetValue(map.mapText, data);
+      }
+      else
+      {
+        if(typeof e.value !== 'object') return ERROR_PROPERTYBIND(data, e.value, stylesheetDataFullStyleListener);
+        if(!e.subchange) removeSubDataListeners(map, data, layer, dbkey);
+        map.value = e.value;
+        
+        if(!e.subchange) addSubDataListeners(map, data, layer, dbkey);
+        map.stop()[map.localAttr] = loopStylesheetValue(map.mapText, data);
+      }
+    }
+  }
+  
+  function stylesheetFunctionDataFullStyleListener(map, data, layer, dbkey)
+  {
+    return function stylesheetFunctionDataFullStyleListener(e)
+    {
+      if(typeof e.value !== 'function')
+      {
+        /* Remove listeners */
+        removeInnerFunctionListeners(map, data, map.value);
+        layer.removeEventListener(dbkey, map.datafunctionlistener);
+        
+        layer.stop()[dbkey] = e.value;
+        
+        /* Add new data listeners */
+        addSubDataListeners(map, data, layer, dbkey);
+        layer.addEventListener(dbkey + 'update', map.datalistener);
+        
+        /* set the dom property */
+        map.value = e.value;
+        map.stop()[map.localAttr] = loopStandardValue(map.mapText, data);
+      }
+      else
+      {
+        /* Remove inner listeners */
+        removeInnerFunctionListeners(map, data, map.value);
+        
+        /* bind the new function to the viewmodel */
+        map.value = (e.value).bind(data);
+        
+        /* add new inner listeners */
+        addInnerFunctionListeners(map, data, map.value);
+        
+        /* set the dom property */
+        map.stop()[map.localAttr] = loopStandardValue(map.mapText, data);
+      }
+    }
+  }
+
+  function styelsheetDataFullPropListener(map, data, layer, dbkey)
+  {
+    return function styelsheetDataFullPropListener(e)
+    {
+      if(typeof e.value === 'function')
+      {
+        /* Remove old listeners */
+        layer.removeEventListener(dbkey + 'update', map.datalistener);
+        removeSubDataListeners(map, data, layer, dbkey);
+
+        /* bind function to the viewmodel */
+        map.value = (e.value).bind(data);
+
+        /* Add the new data listeners */
+        layer.addEventListener(dbkey, map.datafunctionlistener);
+        addInnerFunctionListeners(map, data, map.value);
+
+        /* Set the dom property */
+        map.stop()[map.localAttr] = loopStylesheetValue(map.mapText, data);
+      }
+      else
+      {
+        if(!e.subchange) removeSubDataListeners(map, data, layer, dbkey);
+        map.value = e.value;
+        
+        if(!e.subchange) addSubDataListeners(map, data, layer, dbkey);
+        map.stop()[map.localAttr] = loopStylesheetValue(map.mapText, data);
+      }
+    }
+  }
+  
+  function styelsheetFunctionDataFullPropListener(map, data, layer, dbkey)
+  {
+    return function styelsheetFunctionDataFullPropListener(e)
+    {
+      if(typeof e.value !== 'function')
+      {
+         /* Remove listeners */
+        removeInnerFunctionListeners(map, data, map.value);
+        layer.removeEventListener(dbkey, map.datafunctionlistener);
+        
+        layer.stop()[dbkey] = e.value;
+        
+        /* Add new data listeners */
+        addSubDataListeners(map, data, layer, dbkey);
+        layer.addEventListener(dbkey + 'update', map.datalistener);
+        
+        /* set the dom property */
+        map.value = e.value;
+        map.stop()[map.localAttr] = loopStandardValue(map.mapText, data);
+      }
+      else
+      {
+        /* Remove inner listeners */
+        removeInnerFunctionListeners(map, data, map.value);
+        
+        /* bind the new function to the viewmodel */
+        map.value = (e.value).bind(data);
+        
+        /* add new inner listeners */
+        addInnerFunctionListeners(map, data, map.value);
+        
+        /* set the dom property */
+        map.stop()[map.localAttr] = loopStandardValue(map.mapText, data);
+      }
+    }
+  }
+  
+  function stylesheetDataPropListener(map, data, layer, dbkey)
+  {
+    return function stylesheetDataPropListener(e)
+    {
+      if(typeof e.value === 'function')
+      {
+        /* Remove old listeners */
+        layer.removeEventListener(dbkey + 'update', map.datalistener);
+        
+        /* bind function to the viewmodel */
+        map.value = (e.value).bind(data);
+        
+        /* Add the new data listeners */
+        layer.addEventListener(dbkey, map.datafunctionlistener);
+        addInnerFunctionListeners(map, data, map.value);
+        
+        /* Set the dom property */
+        map.stop()[map.localAttr] = loopStylesheetValue(map.mapText, data);
+      }
+      else
+      {
+        map.value = e.value;
+        map.stop()[map.localAttr] = loopStylesheetValue(map.mapText, data);
+      }
+    }
+  }
+  
+  function stylesheetFunctionDataPropListener(map, data, layer, dbkey)
+  {
+    return function stylesheetFunctionDataPropListener(e)
+    {
+      if(typeof e.value !== 'function')
+      {
+        /* Remove listeners */
+        removeInnerFunctionListeners(map, data, map.value);
+        layer.removeEventListener(dbkey, map.datafunctionlistener);
+        
+        /* Add new data listeners */
+        layer.addEventListener(dbkey + 'update', map.datalistener);
+        
+        /* set the dom property */
+        map.value = e.value;
+        map.stop()[map.localAttr] = loopStandardValue(map.mapText, data);
+      }
+      else
+      {
+        /* Remove inner listeners */
+        removeInnerFunctionListeners(map, data, map.value);
+        
+        /* bind the new function to the viewmodel */
+        map.value = (e.value).bind(data);
+        
+        /* add new inner listeners */
+        addInnerFunctionListeners(map, data, map.value);
+        
+        /* set the dom property */
+        map.stop()[map.localAttr] = loopStandardValue(map.mapText, data);
+      }
+    }
   }
   
   /* STYLE */
@@ -1197,7 +1679,6 @@ window.kaleoi = (function(){
     return __text;
   }
   
-  /* TODO: destruct maps is forever looping */
   function handleMaps__old(map, data)
   {
     /*see map types in locals */

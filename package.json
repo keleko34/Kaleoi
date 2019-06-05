@@ -23,7 +23,7 @@
   },
   "homepage": "https://github.com/keleko34/kaleoi#readme",
   "dependencies": {
-    "czosnek": "^1.5.25",
+    "czosnek": "^1.5.27",
     "frytki": "^1.2.4",
     "peprze": "^1.2.3",
     "pikantny": "^1.5.0",
