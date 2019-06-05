@@ -1382,8 +1382,6 @@ window.kaleoi = (function(){
         removeInnerFunctionListeners(map, data, map.value);
         layer.removeEventListener(dbkey, map.datafunctionlistener);
         
-        layer.stop()[dbkey] = e.value;
-        
         /* Add new data listeners */
         addSubDataListeners(map, data, layer, dbkey);
         layer.addEventListener(dbkey + 'update', map.datalistener);
@@ -1449,8 +1447,6 @@ window.kaleoi = (function(){
          /* Remove listeners */
         removeInnerFunctionListeners(map, data, map.value);
         layer.removeEventListener(dbkey, map.datafunctionlistener);
-        
-        layer.stop()[dbkey] = e.value;
         
         /* Add new data listeners */
         addSubDataListeners(map, data, layer, dbkey);

@@ -437,7 +437,7 @@ function BuildUnitTests()
       kaleoi.createComponent(createComponent('stylesheet'))
       .then(function(){ return kaleoi.createComponent(createComponent('stylesheet')); })
       .then(function(componentA, componentB){
-        componentA.__KaleoiExtensions__.vm.style = { border: '5px solid rgb(250, 250, 250)'};
+        componentA.__KaleoiExtensions__.vm.set('style', { border: '5px solid rgb(250, 250, 250)'});
         expect(getComputedStyle(componentA.children[1].children[0]).border).to.equal('5px solid rgb(250, 250, 250)');
         expect(getComputedStyle(componentB.children[1].children[0]).border).to.not.equal('5px solid rgb(250, 250, 250)');
         kaleoi.removeComponent(componentA);
@@ -450,7 +450,7 @@ function BuildUnitTests()
       kaleoi.createComponent(createComponent('stylesheet'))
       .then(function(){ return kaleoi.createComponent(createComponent('stylesheet')); })
       .then(function(componentA, componentB){
-        componentA.__KaleoiExtensions__.vm.fontWeight = { 'font-weight': '800' }
+        componentA.__KaleoiExtensions__.vm.set('fontWeight', { 'font-weight': '800' });
         expect(getComputedStyle(componentA.children[0]).fontWeight).to.equal('800');
         expect(getComputedStyle(componentB.children[0]).fontWeight).to.not.equal('800');
         kaleoi.removeComponent(componentA);
@@ -463,7 +463,7 @@ function BuildUnitTests()
       kaleoi.createComponent(createComponent('stylesheet'))
       .then(function(){ return kaleoi.createComponent(createComponent('stylesheet')); })
       .then(function(componentA, componentB){
-        componentA.__KaleoiExtensions__.vm.decoration = { 'text-decoration': 'line-through' };
+        componentA.__KaleoiExtensions__.vm.set('decoration', { 'text-decoration': 'line-through' });
         expect(getComputedStyle(componentA.children[0]).textDecoration).to.equal('line-through solid rgb(0, 0, 0)');
         expect(getComputedStyle(componentB.children[0]).textDecoration).to.not.equal('line-through solid rgb(0, 0, 0)');
         kaleoi.removeComponent(componentA);

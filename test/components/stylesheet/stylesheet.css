@@ -14,7 +14,7 @@
   {{computePaddingLeft}}: {{mL}}px;
 }
 
-.stylesheet__inner{{local}} {
+{{local}} .stylesheet__inner {
   color: {{>color}};
   background: {{color}};
   font-size: {{fontSize}}px;
@@ -34,7 +34,7 @@
   {{style | checkStyles}}
 }
 
-.stylesheet__test__inner{{local}} {
+{{local}} .stylesheet__test__inner {
   {{style | checkStyles}}
 }
 
