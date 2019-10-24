@@ -80,7 +80,7 @@ function squashCommits()
         squashModules = `git submodule foreach "git reset --hard HEAD~1 && git merge --squash HEAD@{1} && git commit -m \\"Update to ${ver}\\""`;
 
     console.log(`Squashing commits from publish script...`);
-    exec(`${updateMain} && ${squashMain} && ${squashModules}`, (err, stdout, stderr) => {
+    exec(`${squashModules} && ${updateMain} && ${squashMain}`, (err, stdout, stderr) => {
       if(err) reject('\033[31mERR!\033[37m Failed to squash commits' + err);
       resolve();
     })
