@@ -61,7 +61,7 @@ function updateVersions()
 function pushUpdateToGit()
 {
   return new Promise((resolve, reject) => {
-    var updateMain = `git push -u origin master && git push -u origin v${ver}`,
+    var updateMain = `git add -A && git commit -m "Update submodule versions" && git push -u origin master && git push -u origin v${ver}`,
         updateModules = `git submodule foreach "git push -u origin master && git push -u origin v${ver}"`;
 
     console.log(`Pushing changes to git...`);
