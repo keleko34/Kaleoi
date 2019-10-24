@@ -48,7 +48,7 @@ function updateVersions()
 {
   return new Promise((resolve, reject) => {
     var updateMain = `npm version ${ver}`,
-        updateModules = `git submodule foreach 'npm version ${ver}'`;
+        updateModules = `git submodule foreach "npm version ${ver}"`;
 
     console.log(`Updating versions to ${ver}...`);
     exec(`${updateMain} && ${updateModules}`, (err, stdout, stderr) => {
@@ -62,7 +62,7 @@ function pushUpdateToGit()
 {
   return new Promise((resolve, reject) => {
     var updateMain = `git push origin master && git push origin v${ver}`,
-        updateModules = `git submodule foreach 'git push origin master && git push origin v${ver}'`;
+        updateModules = `git submodule foreach "git push -u origin master && git push -u origin v${ver}"`;
 
     console.log(`Pushing changes to git...`);
     exec(`${updateMain} && ${updateModules}`, (err, stdout, stderr) => {
