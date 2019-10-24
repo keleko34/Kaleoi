@@ -44,6 +44,20 @@ function checkForUnfinishedCommits()
   })
 }
 
+function buildLibraries()
+{
+  return new Promise((resolve, reject) => {
+    var updateMain = `npm run build && git add -A && git commit -m "Build"`,
+        updateModules = `git submodule foreach "npm run build && git add -A && git commit -m \"Build\""`;
+
+    console.log(`Building libraries...`);
+    exec(`${updateModules} && ${updateMain}`, (err, stdout, stderr) => {
+      if(err) reject('\033[31mERR!\033[37m Failed to build the libraries' + err);
+      resolve();
+    })
+  })
+}
+
 function updateVersions()
 {
   return new Promise((resolve, reject) => {
@@ -58,10 +72,25 @@ function updateVersions()
   })
 }
 
+function squashCommits()
+{
+  return new Promise((resolve, reject) => {
+    var updateMain = `git add -A && git commit -m "Update submodule versions"`,
+        squashMain = `git reset --hard HEAD~2 && git merge --squash HEAD@{1} && git commit -m "Update to ${ver}"` 
+        squashModules = `git submodule foreach "git reset --hard HEAD~1 && git merge --squash HEAD@{1} && git commit -m \"Update to ${ver}\""`;
+
+    console.log(`Squashing commits from publish script...`);
+    exec(`${updateMain} && ${squashMain} && ${squashModules}`, (err, stdout, stderr) => {
+      if(err) reject('\033[31mERR!\033[37m Failed to squash commits' + err);
+      resolve();
+    })
+  })
+}
+
 function pushUpdateToGit()
 {
   return new Promise((resolve, reject) => {
-    var updateMain = `git add -A && git commit -m "Update submodule versions" && git push origin master && git push -u origin v${ver}`,
+    var updateMain = `git push origin master && git push -u origin v${ver}`,
         updateModules = `git submodule foreach "git push -u origin master && git push -u origin v${ver}"`;
 
     console.log(`Pushing changes to git...`);
@@ -87,7 +116,9 @@ function publishToNPM()
 }
 
 checkForUnfinishedCommits()
+.then(buildLibraries)
 .then(updateVersions)
+.then(squashCommits)
 .then(pushUpdateToGit)
 .then(publishToNPM)
 .then(() => {

@@ -9,6 +9,7 @@ flags.jsCode = [{src: fs.readFileSync(base+'/kaleoi.js','utf8')}];
 flags.compilationLevel = 'SIMPLE';
 flags.rewritePolyfills = false;
 
+fs.unlinkSync(base+'/kaleoi.min.js');
 fs.writeFileSync(base+'/kaleoi.min.js',closureCompiler(flags).compiledCode);
 
 console.log("Finished Building Minified Library..");
