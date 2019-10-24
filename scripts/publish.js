@@ -91,6 +91,6 @@ checkForUnfinishedCommits()
 .then(pushUpdateToGit)
 .then(publishToNPM)
 .then(() => {
-  console.log('Successfully published a new version!!')
+  console.log(`Successfully published ${ver}`)
 })
 .catch((err) => console.error(err));

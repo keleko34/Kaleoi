@@ -6,7 +6,7 @@
   "scripts": {
     "test": "node ./scripts/test.js",
     "build": "node ./scripts/build.js",
-    "pub": "node ./scripts/publish.js"
+    "publish:npm": "node ./scripts/publish.js"
   },
   "repository": {
     "type": "git",
