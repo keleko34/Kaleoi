@@ -61,6 +61,7 @@ window.kaleoi = (function(){
   /* ERRORS */
   /* REGION */
   
+  /* Throws an error if a bind does not match the desired [prop, value] or {prop:value} format */
   function ERROR_PROPERTYBIND(data, value, func)
   {
     if(!value || typeof value !== 'object')
@@ -76,9 +77,16 @@ window.kaleoi = (function(){
   /* SUB MODULES */
   /* REGION */
   
+  /*
+   ** Fetches all the required sub modules if they do not exist already
+   ** Note: No promise used as solone is a promise shim 
+   */
   function getSubModules(cb)
   {
+    /* Gets the local path by this script tag src location */
     var __localpath = getLocalPath(),
+
+        /* Filters already loaded scripts */
         __modules = ['solone', 'czosnek', 'frytki', 'pikantny', 'peprze']
         .filter(function(v){
           return (!scriptExists(v));
@@ -88,6 +96,7 @@ window.kaleoi = (function(){
         len = __modules.length,
         x = 0;
     
+    /* If all script modules have been loaded we run the callback  */
     if(!len) cb();
     
     for(x;x<len;x++)
@@ -110,11 +119,10 @@ window.kaleoi = (function(){
               __fetched.push(1);
               if(__fetched.length === len) return cb();
             }
-            
         }
         __script.onerror = function(err)
         {
-            console.error('ERR! Script '+__localpath + '/' + __modules[x] + '/init.js' + ' failed to load', err);
+            console.error('ERR! Script '+__localpath + '/' + __modules[x] + '/' + __modules[x] +'.js' + ' failed to load', err);
         }
         
         document.head.appendChild(__script);
@@ -183,6 +191,7 @@ window.kaleoi = (function(){
     return false;
   }
   
+  /* Gets the local path based on the included script src tag */
   function getLocalPath()
   {
     var scripts = document.querySelectorAll('script'),
