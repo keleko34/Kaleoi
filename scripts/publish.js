@@ -4,8 +4,6 @@ var base = process.cwd().replace(/\\/g,'/'),
     modules = ['czosnek', 'frytki', 'peprze', 'pikantny', 'solone'],
     ver = getVersion();
 
-console.log(ver);
-
 function getVersion()
 {
   var args = process.argv.slice(2, process.argv.length);
@@ -47,16 +45,35 @@ function checkForUnfinishedCommits()
 function updateVersions()
 {
   return new Promise((resolve, reject) => {
+    var fin = 0;
+    exec(`npm version ${ver}`, (err, stdout, stderr) => {
+      if(err || stderr) reject('Failed to update version' + (err || stderr));
+      fin += 1;
+      if(fin === 2) resolve();
+    })
     exec(`git submodule foreach 'npm version ${ver}'`, (err, stdout, stderr) => {
       if(err || stderr) reject('Failed to update version' + (err || stderr));
-      resolve();
+      fin += 1;
+      if(fin === 2) resolve();
     })
   })
 }
 
-function pushUpdatedGit()
+function pushUpdateToGit()
 {
-
+  return new Promise((resolve, reject) => {
+    var fin = 0;
+    exec(`git push origin master && git push origin v${ver}`, (err, stdout, stderr) => {
+      if(err || stderr) reject('Failed to push to github' + (err || stderr));
+      fin += 1;
+      if(fin === 2) resolve();
+    })
+    exec(`git submodule foreach 'git push origin master && git push origin v${ver}'`, (err, stdout, stderr) => {
+      if(err || stderr) reject('Failed to push to github' + (err || stderr));
+      fin += 1;
+      if(fin === 2) resolve();
+    })
+  })
 }
 
 function publishToNPM()
@@ -66,7 +83,8 @@ function publishToNPM()
 
 checkForUnfinishedCommits()
 .then(updateVersions)
+.then(pushUpdateToGit)
 .then(() => {
-  console.log('yay you don"t have any commits!')
+  console.log('Success!')
 })
 .catch((err) => console.error(err));
