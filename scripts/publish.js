@@ -47,7 +47,7 @@ function checkForUnfinishedCommits()
 function buildLibraries()
 {
   return new Promise((resolve, reject) => {
-    var updateMain = `npm run build && git add -A && git commit -m "Build"`,
+    var updateMain = `npm run build && git add -A && git commit --allow-empty -m "Build"`,
         updateModules = `git submodule foreach "npm run build && git add -A && git commit --allow-empty -m \\"Build\\""`;
 
     console.log(`Building libraries...`);
