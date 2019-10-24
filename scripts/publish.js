@@ -48,7 +48,7 @@ function buildLibraries()
 {
   return new Promise((resolve, reject) => {
     var updateMain = `npm run build && git add -A && git commit -m "Build"`,
-        updateModules = `git submodule foreach "npm run build && git add -A && git commit -m \"Build\""`;
+        updateModules = `git submodule foreach "npm run build && git add -A && git commit -m \\"Build\\""`;
 
     console.log(`Building libraries...`);
     exec(`${updateModules} && ${updateMain}`, (err, stdout, stderr) => {
@@ -77,7 +77,7 @@ function squashCommits()
   return new Promise((resolve, reject) => {
     var updateMain = `git add -A && git commit -m "Update submodule versions"`,
         squashMain = `git reset --hard HEAD~2 && git merge --squash HEAD@{1} && git commit -m "Update to ${ver}"` 
-        squashModules = `git submodule foreach "git reset --hard HEAD~1 && git merge --squash HEAD@{1} && git commit -m \"Update to ${ver}\""`;
+        squashModules = `git submodule foreach "git reset --hard HEAD~1 && git merge --squash HEAD@{1} && git commit -m \\"Update to ${ver}\\""`;
 
     console.log(`Squashing commits from publish script...`);
     exec(`${updateMain} && ${squashMain} && ${squashModules}`, (err, stdout, stderr) => {
