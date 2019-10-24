@@ -47,20 +47,10 @@ function checkForUnfinishedCommits()
 function updateVersions()
 {
   return new Promise((resolve, reject) => {
-    var len = modules.length,
-        toModule,
-        fin = 0,
-        x = 0;
-    
-    for(x;x<len;x++)
-    {
-      toModule = 'cd ' + base + '/submodules/' + modules[x];
-      exec(toModule + ' && ' + 'npm version ' + ver, (err, stdout, stderr) => {
-        if(err || stderr) reject('Failed to update version' + (err || stderr));
-        fin += 1;
-        if(fin === len) resolve();
-      })
-    }
+    exec(`git submodule foreach 'npm version ${ver}'`, (err, stdout, stderr) => {
+      if(err || stderr) reject('Failed to update version' + (err || stderr));
+      resolve();
+    })
   })
 }
 
