@@ -35,6 +35,8 @@ function getVersion()
 function checkForUnfinishedCommits()
 {
   return new Promise((resolve, reject) => {
+
+    console.log('Checking for unfinished commits...');
     exec('git status', (err, stdout, stderr) => {
       if(stdout.indexOf('modified') !== -1 || err || stderr) reject('You have uncommitted changes');
       resolve();
@@ -45,16 +47,13 @@ function checkForUnfinishedCommits()
 function updateVersions()
 {
   return new Promise((resolve, reject) => {
-    var fin = 0;
-    exec(`npm version ${ver}`, (err, stdout, stderr) => {
+    var updateMain = `npm version ${ver}`,
+        updateModules = `git submodule foreach 'npm version ${ver}'`;
+
+    console.log(`Updating versions to ${ver}...`);
+    exec(`${updateMain} && ${updateModules}`, (err, stdout, stderr) => {
       if(err || stderr) reject('Failed to update version' + (err || stderr));
-      fin += 1;
-      if(fin === 2) resolve();
-    })
-    exec(`git submodule foreach 'npm version ${ver}'`, (err, stdout, stderr) => {
-      if(err || stderr) reject('Failed to update version' + (err || stderr));
-      fin += 1;
-      if(fin === 2) resolve();
+      resolve();
     })
   })
 }
@@ -62,16 +61,13 @@ function updateVersions()
 function pushUpdateToGit()
 {
   return new Promise((resolve, reject) => {
-    var fin = 0;
-    exec(`git push origin master && git push origin v${ver}`, (err, stdout, stderr) => {
+    var updateMain = `git push origin master && git push origin v${ver}`,
+        updateModules = `git submodule foreach 'git push origin master && git push origin v${ver}'`;
+
+    console.log(`Pushing changes to git...`);
+    exec(`${updateMain} && ${updateModules}`, (err, stdout, stderr) => {
       if(err || stderr) reject('Failed to push to github' + (err || stderr));
-      fin += 1;
-      if(fin === 2) resolve();
-    })
-    exec(`git submodule foreach 'git push origin master && git push origin v${ver}'`, (err, stdout, stderr) => {
-      if(err || stderr) reject('Failed to push to github' + (err || stderr));
-      fin += 1;
-      if(fin === 2) resolve();
+      resolve();
     })
   })
 }
