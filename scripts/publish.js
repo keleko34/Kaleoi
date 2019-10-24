@@ -38,7 +38,7 @@ function checkForUnfinishedCommits()
 
     console.log('Checking for unfinished commits...');
     exec('git status', (err, stdout, stderr) => {
-      if(stdout.indexOf('modified') !== -1 || err || stderr) reject('You have uncommitted changes');
+      if(stdout.indexOf('modified') !== -1 || err || stderr) reject('\033[31mERR!\033[37m You have uncommitted changes');
       resolve();
     })
   })
@@ -52,7 +52,7 @@ function updateVersions()
 
     console.log(`Updating versions to ${ver}...`);
     exec(`${updateMain} && ${updateModules}`, (err, stdout, stderr) => {
-      if(err || stderr) reject('Failed to update version' + (err || stderr));
+      if(err || stderr) reject('\033[31mERR!\033[37m Failed to update version' + (err || stderr));
       resolve();
     })
   })
@@ -66,7 +66,7 @@ function pushUpdateToGit()
 
     console.log(`Pushing changes to git...`);
     exec(`${updateMain} && ${updateModules}`, (err, stdout, stderr) => {
-      if(err || stderr) reject('Failed to push to github' + (err || stderr));
+      if(err || stderr) reject('\033[31mERR!\033[37m Failed to push to github' + (err || stderr));
       resolve();
     })
   })
@@ -80,7 +80,7 @@ function publishToNPM()
 
     console.log(`Publishing to NPM...`);
     exec(`${updateMain} && ${updateModules}`, (err, stdout, stderr) => {
-      if(err || stderr) reject('Failed to publish to NPM' + (err || stderr));
+      if(err || stderr) reject('\033[31mERR!\033[37m Failed to publish to NPM' + (err || stderr));
       resolve();
     })
   })
