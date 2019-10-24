@@ -1,15 +1,15 @@
 [submodule "solone"]
-	path = solone
+	path = submodules/solone
 	url = https://github.com/keleko34/solone.git
 [submodule "czosnek"]
-	path = czosnek
+	path = submodules/czosnek
 	url = https://github.com/keleko34/czosnek.git
 [submodule "frytki"]
-	path = frytki
+	path = submodules/frytki
 	url = https://github.com/keleko34/frytki.git
 [submodule "pikantny"]
-	path = pikantny
+	path = submodules/pikantny
 	url = https://github.com/keleko34/pikantny.git
 [submodule "peprze"]
-	path = peprze
+	path = submodules/peprze
 	url = https://github.com/keleko34/peprze.git

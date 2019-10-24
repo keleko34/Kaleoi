@@ -4,8 +4,9 @@
   "description": "Data management",
   "main": "kaleoi.min.js",
   "scripts": {
-    "test": "node ./test/run.js",
-    "build": "node ./build.js"
+    "test": "node ./scripts/test.js",
+    "build": "node ./scripts/build.js",
+    "publish": "node ./scripts/publish.js"
   },
   "repository": {
     "type": "git",

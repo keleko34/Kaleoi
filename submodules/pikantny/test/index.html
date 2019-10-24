@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Testing</title>
+    <link rel="stylesheet" href="/node_modules/mocha/mocha.css" />
+  </head>
+  <body>
+    <div class="test_subjects">
+        <h2>Element tests:</h2>
+        <div id="test_element" class="test_subject__element" role="button" data-custom="custom_data" style="color:rgb(0, 0, 0);font-size:14px;margin:0px;">
+            Parent Element
+            <div class="test_subject__element__child" id="test_element__sub"> - Sub Element</div>
+        </div>
+      <div class="test_inputs">
+          <h2>Input tests:</h2>
+          <input id="test_input" class="test_subject__element__input" type="text" value="Input Element"/><br />
+          <input id="test_checkbox" class="test_subject__element__checkbox" type="checkbox" value="cool"/><br />
+          <textarea id="test_textarea" class="test_subject__element__textarea">Textarea Element</textarea><br />
+          <select id="test_selection" class="test_subject__element__select">
+            <option value="1">1</option>
+            <option value="2">2</option>
+          </select><br />
+      </div>
+    </div>
+    <div class="test">
+      <div class="section">Unit Tests</div>
+      <div id="mocha"></div>
+      <div id="messages"></div>
+      <div id="fixtures"></div>
+    </div>
+    <div class="performance">
+      <div class="section"><a href="#tasks">Benchmark Tests</a></div>
+      <iframe id="pikantny_performance"></iframe>
+      <script type="text/javascript">
+        var pikantnyFrame = document.getElementById('pikantny_performance'),
+            pikantnyDocument = pikantnyFrame.contentDocument || pikantnyFrame.contentWindow.document,
+            pikantnyWindow = pikantnyFrame.contentWindow || pikantnyFrame;
+            
+        pikantnyDocument.open();
+        pikantnyDocument.write('<html><head><\/head><body><div id="test"><\/div><input id="test_input" type="text" /><script type="text\/javascript" src="\/pikantny.js"><\/script><\/body><\/html>');
+        pikantnyDocument.close();
+      </script>
+      <iframe id="KB_performance"></iframe>
+      <script type="text/javascript">
+        var KBFrame = document.querySelector('#KB_performance'),
+            KBDocument = KBFrame.contentDocument || KBFrame.contentWindow.document,
+            KBWindow = KBFrame.contentWindow || KBFrame;
+        
+        KBDocument.open();
+        KBDocument.write('<html><head><\/head><body><div id="test"><\/div><input id="test_input" type="text" /><script type="text\/javascript" src="\/test\/tests\/performance\/vendors\/KB.js"><\/script><script type="text\/javascript">var kb = CreateKB();kb.call();<\/script><\/body><\/html>');
+        KBDocument.close();
+        
+      </script>
+      <div id="tasks"></div>
+    </div>
+    <style>
+      .test_subjects {
+        margin-left: 50px;
+      }
+      .test_subject__element__child {
+        margin-left: 20px;
+      }
+      .test, .performance {
+        margin: 30px 50px;
+      }
+      .section {
+        font-size:24px;
+        text-decoration: underline;
+        color: blue;
+        font-family: sans-serif;
+      }
+      #mocha {
+        margin-top:10px;
+      }
+    </style>
+    <script type="text/javascript" src="/pikantny.js"></script>
+    <script type="text/javascript" src="/node_modules/lodash/lodash.min.js"></script>
+    <script type="text/javascript" src="/node_modules/platform/platform.js"></script>
+    <script type="text/javascript" src="/node_modules/benchmark/benchmark.js"></script>
+    <script type="text/javascript" src="/node_modules/mocha/mocha.js"></script>
+    <script type="text/javascript" src="/node_modules/chai/chai.js"></script>
+    <script type="text/javascript" src="/node_modules/sinon/pkg/sinon.js"></script>
+    <script type="text/javascript" src="/node_modules/sinon-chai/lib/sinon-chai.js"></script>
+    
+    <!-- unit tests -->
+    <script type="text/javascript" src="/test/tests/unit/standard_dom_properties.js"></script>
+    <script type="text/javascript" src="/test/tests/unit/standard_dom_functions.js"></script>
+    <script type="text/javascript" src="/test/tests/unit/standard_dom_attributes.js"></script>
+    <script type="text/javascript" src="/test/tests/unit/standard_dom_styles.js"></script>
+    <script type="text/javascript" src="/test/tests/unit.js"></script>
+    
+    <!-- performance -->
+    <script type="text/javascript" src="/test/tests/performance.js"></script>
+    <script type="text/javascript" src="/test/tests/performance/vendors/jquery-3.3.1.js"></script>
+  </body>
+</html>

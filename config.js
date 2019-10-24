@@ -3,7 +3,7 @@ module.exports = {
   /* Used to determin the prefixed path of where to search for the components */
   prefix: '',
   
-  /* Default filters that are available touse in components */
+  /* Default filters that are available to use in components */
   filters: {
     
   },
