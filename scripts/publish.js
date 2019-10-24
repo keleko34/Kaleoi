@@ -61,7 +61,7 @@ function updateVersions()
 function pushUpdateToGit()
 {
   return new Promise((resolve, reject) => {
-    var updateMain = `git push origin master && git push origin v${ver}`,
+    var updateMain = `git push -u origin master && git push -u origin v${ver}`,
         updateModules = `git submodule foreach "git push -u origin master && git push -u origin v${ver}"`;
 
     console.log(`Pushing changes to git...`);
@@ -74,13 +74,23 @@ function pushUpdateToGit()
 
 function publishToNPM()
 {
+  return new Promise((resolve, reject) => {
+    var updateMain = `npm publish`,
+        updateModules = `git submodule foreach "npm publish"`;
 
+    console.log(`Publishing to NPM...`);
+    exec(`${updateMain} && ${updateModules}`, (err, stdout, stderr) => {
+      if(err || stderr) reject('Failed to publish to NPM' + (err || stderr));
+      resolve();
+    })
+  })
 }
 
 checkForUnfinishedCommits()
 .then(updateVersions)
 .then(pushUpdateToGit)
+.then(publishToNPM)
 .then(() => {
-  console.log('Success!')
+  console.log('Successfully published a new version!!')
 })
 .catch((err) => console.error(err));
