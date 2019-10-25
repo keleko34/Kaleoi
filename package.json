@@ -1,6 +1,6 @@
 {
   "name": "kaleoi",
-  "version": "1.5.42",
+  "version": "1.5.43",
   "description": "Data management",
   "main": "kaleoi.min.js",
   "scripts": {
