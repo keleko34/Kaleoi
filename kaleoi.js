@@ -1,6 +1,7 @@
 window.__KaleoiExtensions__ = {
   config: {},
-  components: {}
+  components: {},
+  model: {}
 }
 
 window.kaleoi = (function(){
@@ -79,7 +80,7 @@ window.kaleoi = (function(){
   
   /*
    ** Fetches all the required sub modules if they do not exist already
-   ** Note: No promise used as solone is a promise shim 
+   ** Note: No promise used as solone is a promise shim for older browsers
    */
   function getSubModules(cb)
   {
@@ -99,27 +100,37 @@ window.kaleoi = (function(){
     /* If all script modules have been loaded we run the callback  */
     if(!len) cb();
     
+    /* when the file loads we add it to fetched, we runt he callback when all modules have been loaded */
+    function onload()
+    {
+      if(this.title === 'solone')
+      {
+        solone.init(function(){
+          __fetched.push(1);
+          if(__fetched.length === len) return cb();
+        })
+      }
+      else
+      {
+        __fetched.push(1);
+        if(__fetched.length === len) return cb();
+      }
+    }
+
     for(x;x<len;x++)
     {
         __script = document.createElement('script');
         __script.setAttribute('src', __localpath + '/' + __modules[x] + '/' + __modules[x] + '.js');
         __script.setAttribute('type', 'text/javascript');
         __script.setAttribute('title', __modules[x]);
-        __script.onload = function()
+        __script.onload = onload;
+
+        /* The IE madness is real IE ONLY */
+        __script.onreadystatechange = function()
         {
-            if(this.title === 'solone')
-            {
-              solone.init(function(){
-                __fetched.push(1);
-                if(__fetched.length === len) return cb();
-              })
-            }
-            else
-            {
-              __fetched.push(1);
-              if(__fetched.length === len) return cb();
-            }
+          if(this.readyState === 'complete') onload.call(this);
         }
+        
         __script.onerror = function(err)
         {
             console.error('ERR! Script '+__localpath + '/' + __modules[x] + '/' + __modules[x] +'.js' + ' failed to load', err);
@@ -128,12 +139,13 @@ window.kaleoi = (function(){
         document.head.appendChild(__script);
     }
   }
-  
+
   /* ENDREGION */
   
   /* FILE HANDLING */
   /* REGION */
   
+  /* creates a js script tag based off text */
   function createScript(title, script)
   {
     var sc = document.createElement('script');
@@ -143,21 +155,27 @@ window.kaleoi = (function(){
     document.head.appendChild(sc);
     return sc;
   }
-  
+
+  /* Fetches a file (component, etc) using GET XMLHttpRequest */
   function fetchFile(url, headers)
   {
     return new Promise(function(resolve, reject){
     
-      var __xhr = new XMLHttpRequest()
+      var __xhr = new XMLHttpRequest();
 
       __xhr.open('GET', url, true);
 
+      /* Set headers for the request if they have been passed */
       if(headers)
       {
-        Object.keys(headers)
-        .forEach(function(v){
-          __xhr.setRequestHeader(v, headers[v]);
-        })
+        var keys = Object.keys(headers),
+            len = keys.length,
+            x = 0;
+
+        for(x;x<len;x++)
+        {
+          __xhr.setRequestHeader(v, headers[keys[x]]);
+        }
       }
       
       __xhr.onreadystatechange = function()
@@ -179,6 +197,7 @@ window.kaleoi = (function(){
     });
   }
   
+  /* Checks if a given script containing a keyword exists already in the dom */
   function scriptExists(title)
   {
     var scripts = document.querySelectorAll('script'),
@@ -214,17 +233,20 @@ window.kaleoi = (function(){
   {
     var __configs = __KaleoiExtensions__.config;
     
+    /* loop passed configs to attach */
     Object.keys(configs)
       .forEach(function(k){
+
+        /* add to the already existing config object */
         if(__configs[k] && typeof __configs[k] === 'object')
         {
           if(__configs[k].length)
           {
-            __configs[k].concat(__configs[k]);
+            __configs[k].concat(configs[k]);
           }
           else
           {
-            Object.keys(__configs[k]).forEach(function(key){
+            Object.keys(configs[k]).forEach(function(key){
               __configs[k][key] = configs[k][key];
             })
           }
@@ -242,12 +264,15 @@ window.kaleoi = (function(){
     var __config = __KaleoiExtensions__.config,
         __prefix = (__config.prefix || '');
     
+    /* Fetch global, local, and local auth */
     return Promise.all([
       fetchFile('/node_modules/kaleoi/config.js'),
       fetchFile(__prefix + '/config.js'),
       fetchFile(__prefix + '/auth-client.js')
     ])
     .then(function(nodeConfig, localConfig, auth){
+
+      /* load config scripts, update the global config and clean up */
       var script = createScript('config_setup', ''),
           script_auth = createScript('auth', auth);
       
@@ -263,7 +288,7 @@ window.kaleoi = (function(){
       local_config = null;
       document.head.removeChild(script);
       document.head.removeChild(script_auth);
-  })
+    })
     .catch(function(){
       console.error('Failed to fetch configs', arguments);
     });
@@ -274,12 +299,14 @@ window.kaleoi = (function(){
   /* HELPER METHODS */
   /* REGION */
   
+  /* get the last key on a Object string, eg obj.obj.key */
   function getKey(key)
   {
     return (key.split('.').pop());
   }
   
-  function getDescriptor(value,writable,enumerable, redefinable)
+  /* universal descriptor */
+  function getDescriptor(value, writable, enumerable, redefinable)
   {
     return {
         value:value,
@@ -289,6 +316,7 @@ window.kaleoi = (function(){
     }
   }
   
+  /* shallow copy from one object to another */
   function copy(obj1, obj2)
   {
     var keys = Object.keys(obj2),
@@ -302,6 +330,7 @@ window.kaleoi = (function(){
     return obj1;
   }
   
+  /* bind all methods on an object to a bindable object */
   function bindMethods(bindable, obj)
   {
     var keys = Object.keys(obj),
@@ -316,6 +345,7 @@ window.kaleoi = (function(){
     return obj;
   }
   
+  /* shallow checks all properties if they have getter/setter descriptors, if not it creates them  */
   function convertStaticsToObservables(obj)
   {
     var keys = Object.keys(obj),
@@ -328,6 +358,7 @@ window.kaleoi = (function(){
     return obj;
   }
   
+  /* Parses the attributes object into simple object */
   function parseAttributes(node)
   {
     var __attr = __slice.call(node.attributes),
@@ -341,15 +372,19 @@ window.kaleoi = (function(){
     return __obj;
   }
   
+  /* Parses a function to see if the `this` keyword was used and what properties were used from it */
   function getFunctionVariables(func)
   {
     var funcString = func.toString(),
+        /* maps var if someone used inside a function: var keyword = this; */
         matchVariable = funcString.match(__matchThisVariable),
+        /* maps all the properties used from `this` keyword */
         matchProperties = funcString.match(__matchThisProperties),
         variable,
         rx,
         variableProperties = [];
     
+    /* if a variable was used we fetch all used properties using this variable term */
     if(matchVariable)
     {
       variable = matchVariable[0].replace(__matchThisVariable, '$2');
@@ -359,7 +394,7 @@ window.kaleoi = (function(){
         return v.replace(rx, '$2');
       });
     }
-    
+    /* fetches all the properties used with the `this` keyword */
     if(matchProperties)
     {
       return matchProperties
@@ -369,9 +404,10 @@ window.kaleoi = (function(){
       .concat(variableProperties);
     }
     
-    return [];
+    return variableProperties;
   }
   
+  /* gets the name of the function */
   function getFunctionName(func)
   {
     return (func.name || func.toString().replace(__replaceFunctionName, '$2') || func.toString());
@@ -388,6 +424,7 @@ window.kaleoi = (function(){
       /* holds all the listeners for all components */
       __eventbus = {};
   
+  /* listen to key on the evnt bus, fires method when an alert happens */
   function listen(key, func)
   {
     if(!__eventbus[key]) __eventbus[key] = [];
@@ -396,6 +433,7 @@ window.kaleoi = (function(){
     return Kaleoi;
   }
   
+  /* stop listening to alerts */
   function unlisten(key, func)
   {
     var event = __eventbus[key]
@@ -416,6 +454,7 @@ window.kaleoi = (function(){
     return Kaleoi;
   }
   
+  /* run all listener methods with the new value */
   function alert(key, value)
   {
     var event = __eventbus[key];
@@ -437,6 +476,7 @@ window.kaleoi = (function(){
   /* HANDLING STORAGE */
   /* REGION */
   
+  /* Fetch JSON string data from the storage to attach to a data object */
   function getStorage(type, key, obj)
   {
     var __data = (type !== 'model' ? window[type + 'Storage'].getItem(key) : __model.get(key))
@@ -444,28 +484,41 @@ window.kaleoi = (function(){
     return obj;
   }
   
+  /* Set a JSON string data to storage from a data object */
   function setStorage(type, key, obj)
   {
     window[type + 'Storage'].setItem(key, JSON.stringify(obj));
     return obj;
   }
   
+  /* Set data from storage, if storage/model data does not exist we set it */
   function storageHelper(key, filters, data)
   {
+    /* priority: model <= session <= local, model being of most importance */
     var storageType = ((filters.model.length && 'model') || (filters.session.length && 'session') || (filters.local.length && 'local')),
-        storageKey = (['local', 'session'].indexOf(storageType) !== -1 ? storageType + 'Storage' : storageType), 
+
+        /* Get the property for accessing the stored data */
+        storageKey = (['local', 'session'].indexOf(storageType) !== -1 ? storageType + 'Storage' : storageType),
+
+        /* Check if the storage contains the data we want */
         storeGet = (storageKey && (storageKey !== 'model' ? window[storageKey].getItem(filters[storageType][0]) : __model.get(key)));
     
+    /* If we have any stored data */
     if(storageType)
     {
+      /* If we have any data we can fetch from storage */
       if(storeGet !== undefined)
       {
         return data.set(key, (typeof storeGet === 'string' ? JSON.parse(storeGet) : storeGet));
       }
+
+      /* Set the storage with the current data */
       if(storageType !== 'model')
       {
          return window[storageKey].setItem(filters[storageType], data.get(key));
       }
+
+      /* Set the model with the current data */
       return (__model.set(filters[storageType], data.get(key)));
     }
   }
@@ -489,16 +542,26 @@ window.kaleoi = (function(){
     return vm;
   }
   
+  /* helps to extend the functionality of each component class */
   function wrap_component(title, component)
   {
-    function component_wrapper(expanded, innerHTML, params)
+    function Component_wrapper(expanded, innerHTML, params)
     {
       /* SET EXTRA FUNCTIONALITY DEFAULTS */
       Object.defineProperties(this, {
+        /* Whether the data in this component should be stored in session storage */
         sessionStorage: getDescriptor(false, true),
+
+        /* Whether the data in this component should be stored in local storage */
         localStorage: getDescriptor(false, true),
+
+        /* Whether the data in this component should be stored in the model */
         store: getDescriptor(false, true),
+
+        /* Whether this component is allowed to have multiple copies of itself as child components (recursive) */
         multiple: getDescriptor(false, true),
+
+        /* extends the filters */
         filters: getDescriptor(copy({}, __config.filters)),
         
         /* COMPONENT INNER CHILD NODES */
@@ -507,9 +570,10 @@ window.kaleoi = (function(){
         /* THE ACTUAL EXPANDED COMPONENT NODES */
         component: getDescriptor(expanded, true),
         
-        /* This method runs after the componetn has fully rendered */
+        /* This method runs after the component has fully rendered */
         onfinish: getDescriptor(function(){}, true),
         
+        /* Make a copy of the frytki extensions */
         __frytkiExtensions__: getDescriptor(frytki().__frytkiExtensions__, true)
       })
       
@@ -523,6 +587,7 @@ window.kaleoi = (function(){
       if(this.localStorage)
       {
         getStorage('local', this.name, this);
+        /* listen for any update and update the storage */
         this.addEventListener('*update', (function(){
           setStorage('local', this.name, this);
         }).bind(this))
@@ -531,6 +596,7 @@ window.kaleoi = (function(){
       if(this.sessionStorage)
       {
         getStorage('session', this.name, this);
+        /* listen for any update and update the storage */
         this.addEventListener('*update', (function(){
           setStorage('session', this.name, this);
         }).bind(this))
@@ -539,39 +605,41 @@ window.kaleoi = (function(){
       if(this.store)
       {
         getStorage('model', this.name, this);
+        /* listen for any update and update the storage */
         this.addEventListener('*update', (function(){
           setStorage('model', this.name, this);
         }).bind(this))
       }
       
+      /* If any params were passed we add them to the object */
       if(params) handleParams(this, params);
       
       /* BIND SUB METHODS TO THIS */
       bindMethods(this, this);
       
-      /* TODO: check which properties are being overwritten to make sure no standard props are included */
       /* OVERWRITE ALL ENUMERABLE PROPERTIES TO BE OBSERVABLE */
       return convertStaticsToObservables(this);
     }
     
     /* Inherit from frytki */
-    component_wrapper.prototype = frytki();
+    Component_wrapper.prototype = frytki();
     
     /* COPY PROTOTYPES FROM COMPONENT */
-    component_wrapper.prototype = copy(component_wrapper.prototype, component.prototype);
+    Component_wrapper.prototype = copy(Component_wrapper.prototype, component.prototype);
     
     /* SET EXTRA PROTOTYPE FUNCTIONALITY */
-    component_wrapper.prototype.name = title;
-    component_wrapper.prototype.listen = listen;
-    component_wrapper.prototype.unlisten = unlisten;
-    component_wrapper.prototype.alert = alert;
+    Component_wrapper.prototype.name = title;
+    Component_wrapper.prototype.listen = listen;
+    Component_wrapper.prototype.unlisten = unlisten;
+    Component_wrapper.prototype.alert = alert;
     
-    return component_wrapper;
+    return Component_wrapper;
   }
   
+  /* Fetch the component view model file and wrap the component with extra functionality */
   function fetchComponentVM(title)
   {
-    var __exists = (!!__components[title]);
+    var __exists = !!__components[title];
     
     return solone(title)
     .then(function(component){
@@ -596,15 +664,15 @@ window.kaleoi = (function(){
   /* HANDLING COMPONENTS */
   /* REGION */
   
+  /* Fetches from the server all the components that do not exist yet */
   function fetchUnknownComponents(components)
   {
-    var __promises = components.map(function(v){
-          return fetchComponentVM(v);
-        })
-    
-    return Promise.all(__promises);
+    return Promise.all(components.map(function(v){
+      return fetchComponentVM(v);
+    }));
   }
   
+  /* Check which components have not been fetched yet */
   function checkIfComponentsFetched(components)
   {
     var __unfetched = [],
