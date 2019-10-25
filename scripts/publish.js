@@ -76,8 +76,8 @@ function squashCommits()
 {
   return new Promise((resolve, reject) => {
     var updateMain = `git add -A && git commit -m "Update submodule versions"`,
-        squashMain = `git reset --hard HEAD~2 && git merge --squash HEAD@{1} && git commit -m "Update to ${ver}"` 
-        squashModules = `git submodule foreach "git reset --hard HEAD~1 && git merge --squash HEAD@{1} && git commit -m \\"Update to ${ver}\\""`;
+        squashMain = `git reset --hard HEAD~3 && git merge --squash HEAD@{1} && git commit -m "Update to ${ver}"` 
+        squashModules = `git submodule foreach "git reset --hard HEAD~2 && git merge --squash HEAD@{1} && git commit -m \\"Update to ${ver}\\""`;
 
     console.log(`Squashing commits from publish script...`);
     exec(`${squashModules} && ${updateMain} && ${squashMain}`, (err, stdout, stderr) => {
