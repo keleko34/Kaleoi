@@ -81,7 +81,7 @@ function updateDependencyVersions()
         pkg.dependencies[key] = ver;
       })
     
-    fs.writeFile(base + '/package.json', JSON.stringify(pkg, { spacing: 2 }), (err) => {
+    fs.writeFile(base + '/package.json', JSON.stringify(pkg, null, 2), (err) => {
       if(err) return reject(err);
       resolve();
     });
