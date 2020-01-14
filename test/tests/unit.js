@@ -488,12 +488,12 @@ function BuildUnitTests()
       kaleoi.createComponent(createComponent('style'))
       .then(function(component){
         expect(component.style.fontFamily).to.equal('"sans serif"');
-        component.__KaleoiExtensions__.vm.style = { fontFamily: 'Open Sans' }
+        component.__KaleoiExtensions__.vm.set('style', { fontFamily: 'Open Sans' });
         /* Font family is really wierd */
-        expect(component.style.fontFamily).to.equal('Open Sans');
+        expect(component.style.fontFamily).to.equal('"Open Sans"');
         
-        component.__KaleoiExtensions__.vm.style.fontFamily = 'sans serif';
-        expect(component.style.fontFamily).to.equal('sans serif');
+        component.__KaleoiExtensions__.vm.set('style', { fontFamily: 'sans serif' });
+        expect(component.style.fontFamily).to.equal('"sans serif"');
         kaleoi.removeComponent(component);
         done();
       })
@@ -502,7 +502,7 @@ function BuildUnitTests()
       kaleoi.createComponent(createComponent('style'))
       .then(function(component){
         expect(component.children[0].style.fontSize).to.equal('24px');
-        component.__KaleoiExtensions__.vm.computeStyle = { fontSize: '30px' }
+        component.__KaleoiExtensions__.vm.set('computeStyle', { fontSize: '30px' });
         expect(component.children[0].style.fontSize).to.equal('30px');
         kaleoi.removeComponent(component);
         done();

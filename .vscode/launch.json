@@ -1,0 +1,35 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Test Czosnek",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:8080",
+      "userDataDir": "${workspaceRoot}/.vscode/chrome",
+      "sourceMaps": true,
+      "webRoot": "${workspaceRoot}/submodules/czosnek",
+      "preLaunchTask": "Test Czosnek"
+    },
+    {
+      "name": "Test Frytki",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:8080",
+      "userDataDir": "${workspaceRoot}/.vscode/chrome",
+      "sourceMaps": true,
+      "webRoot": "${workspaceRoot}/submodules/czosnek",
+      "preLaunchTask": "Test Frytki"
+    },
+    {
+      "name": "Test Pikantny",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:8080",
+      "userDataDir": "${workspaceRoot}/.vscode/chrome",
+      "sourceMaps": true,
+      "webRoot": "${workspaceRoot}/submodules/czosnek",
+      "preLaunchTask": "Test Pikantny"
+    }
+  ]
+}

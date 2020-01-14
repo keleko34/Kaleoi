@@ -98,9 +98,9 @@ window.kaleoi = (function(){
         x = 0;
     
     /* If all script modules have been loaded we run the callback  */
-    if(!len) cb();
+    if(!len) solone.init(cb);
     
-    /* when the file loads we add it to fetched, we runt he callback when all modules have been loaded */
+    /* when the file loads we add it to fetched, we run the callback when all modules have been loaded */
     function onload()
     {
       if(this.title === 'solone')
@@ -201,7 +201,7 @@ window.kaleoi = (function(){
   function scriptExists(title)
   {
     var scripts = document.querySelectorAll('script'),
-        len = scripts.len,
+        len = scripts.length,
           x = 0;
     for(x;x<len;x++)
     {
@@ -413,6 +413,11 @@ window.kaleoi = (function(){
     return (func.name || func.toString().replace(__replaceFunctionName, '$2') || func.toString());
   }
   
+  function getFullStylePropertyName(name)
+  {
+    return name.replace(/([A-Z])/g, '-$1');
+  }
+
   /* ENDREGION */
   
   /* HANDLING EVENT MESSAGING */
@@ -687,21 +692,27 @@ window.kaleoi = (function(){
     return __unfetched;
   }
   
+  /* Fetch all sub components and map them */
   function createComponents(node)
   {
+    /* Parses html string for elements that are not normal DOM elements */
     var __unknown = czosnek.getUnknown(node),
+
+        /* Checks which components have not been fetched from the server */
         __unfetched = checkIfComponentsFetched(__unknown),
         len = __unknown.length,
         x = 0;
     
+    /* If any components are not fetched from the server we fetch them and then map them */
     if(__unfetched.length)
     {
       fetchUnknownComponents(__unfetched)
       .then(function(){ for(x;x<len;x++) { mapComponent(__unknown[x]) } })
       .catch(function(e){
         console.error('Failed to fetch components: ', __unfetched, e);
-      })
+      });
     }
+    /* else if we just map all components  */
     else if(__unknown.length)
     {
        for(x;x<len;x++)
@@ -711,6 +722,7 @@ window.kaleoi = (function(){
     }
   }
   
+  /* Method to individually fetch a component and return it */
   function createComponent(node)
   {
     var title = node.nodeName.toLowerCase();
@@ -720,8 +732,8 @@ window.kaleoi = (function(){
         .then(function(){ return mapComponent(node) })
         .then(function(map){ resolve(map.component) })
         .catch(function(e){
-          console.error('Failed to fetch component: ', title, e);
-          reject();
+          e.message = 'Failed to fetch component: ' + title;
+          reject(e);
         })
       }
       else
@@ -731,6 +743,7 @@ window.kaleoi = (function(){
     })
   }
   
+  /* Removes a component from the dom and destructs all maps */
   function removeComponent(component)
   {
     component.__CzosnekRoot__.destruct();
@@ -745,12 +758,12 @@ window.kaleoi = (function(){
   function mapComponent(component)
   {
     var __title = component.nodeName.toLowerCase(),
-        __map = (new czosnek(__title)),
+        __map = new czosnek(__title),
         __maps = __map.maps,
         __params = parseAttributes(component),
         __innerHTML = component.childNodes,
         __expanded = __map.component,
-        __vm = (new __components[__title](__expanded, __innerHTML, __params)),
+        __vm = new __components[__title](__expanded, __innerHTML, __params),
         len = __maps.length,
         x = 0;
     
@@ -771,7 +784,7 @@ window.kaleoi = (function(){
   }
   
   function runThroughFilters(value, filters, filterFuncs)
-  { 
+  {
     var len = filters.length,
         x = 0;
     
@@ -1280,7 +1293,6 @@ window.kaleoi = (function(){
     return __text;
   }
   
-  /* Hey doofus, it seems the styles are being set with two semi colons and [Object object] */
   /* This loops all the stylesheet binds */
   function loopStylesheetValue(mapText, data)
   {
@@ -1306,7 +1318,11 @@ window.kaleoi = (function(){
 
           if(!__val || typeof __val !== 'object') return ERROR_PROPERTYBIND(data, __val, loopStylesheetValue);
 
-          __val = JSON.stringify(__val, null, 2).replace(/[{}"]/g, '');
+          __val = JSON.stringify(__val, null, 2)
+          .replace(/[{}",]/g, '')
+          .replace(/[\r\n]/g, ';\r\n')
+          .replace(';', '');
+
           __text += __val;
           if(__map.isInsert)
           {
@@ -1440,9 +1456,8 @@ window.kaleoi = (function(){
       else
       {
         if(typeof e.value !== 'object') return ERROR_PROPERTYBIND(data, e.value, stylesheetDataFullStyleListener);
-        if(!e.subchange) removeSubDataListeners(map, data, layer, dbkey);
         map.value = e.value;
-        
+
         if(!e.subchange) addSubDataListeners(map, data, layer, dbkey);
         map.stop()[map.localAttr] = loopStylesheetValue(map.mapText, data);
       }
@@ -1506,9 +1521,9 @@ window.kaleoi = (function(){
       }
       else
       {
-        if(!e.subchange) removeSubDataListeners(map, data, layer, dbkey);
+        if(typeof e.value !== 'object') return ERROR_PROPERTYBIND(data, e.value, styelsheetDataFullPropListener);
         map.value = e.value;
-        
+
         if(!e.subchange) addSubDataListeners(map, data, layer, dbkey);
         map.stop()[map.localAttr] = loopStylesheetValue(map.mapText, data);
       }
@@ -1612,11 +1627,415 @@ window.kaleoi = (function(){
   }
   
   /* STYLE */
+  /* style refers to the elements inline style property: full style, full prop style, prop name, string */
   function handleStyle(map, data)
   {
+    var __layer = data.findLayer(map.key),
+        __key = getKey(map.key);
     
+    if(map.isFullStyle)
+    {
+      loopFullStyle(map, data);
+      if(!map.isInsert)
+      {
+        map.datalistener = styleDataFullListener(map, data, __layer, __key);
+        map.datafunctionlistener = styleFunctionFullListener(map, data, __layer, __key);
+        if(typeof map.value !== 'function') addSubDataListeners(map, data, __layer, __key);
+      }
+    }
+    else if(map.isFullProp)
+    {
+      loopStyleFullProperty(map, data);
+      if(!map.isInsert)
+      {
+        map.datalistener = styleFullPropDataListener(map, data, __layer, __key);
+        map.datafunctionlistener = styleFullPropFunctionListener(map, data, __layer, __key);
+        if(typeof map.value !== 'function') addSubDataListeners(map, data, __layer, __key);
+      }
+    }
+    else if(map.isProperty)
+    {
+      loopStylePropertyName(map, data);
+      if(!map.isInsert)
+      {
+        map.datalistener = stylePropDataListener(map, data, __layer, __key);
+        map.datafunctionlistener = stylePropFunctionListener(map, data, __layer, __key);
+      }
+    }
+    else
+    {
+      map.stop().style[map.property] = loopStyleValue(map.mapText, data);
+      if(!map.isInsert)
+      {
+        map.datalistener = styleDataListener(map, data, __layer, __key);
+        map.datafunctionlistener = styleFunctionListener(map, data, __layer, __key);
+      }
+    }
+
+    if(!map.isInsert)
+    {
+      if(typeof map.value === 'function')
+      {
+        __layer.addEventListener(__key, map.datafunctionlistener);
+      }
+      else
+      {
+        __layer.addEventListener(__key + 'update', map.datalistener);
+      }
+    }
+  }
+
+  function loopFullStyle(map, data)
+  {
+    var __dataFilters = data.filters,
+        __val = runThroughFilters(typeof map.value === 'function' ? map.value() : map.value, map.filters.filters, __dataFilters),
+        __keys = Object.keys(__val),
+        len = __keys.length,
+        x = 0;
+    
+    for(x;x<len;x++)
+    {
+      map.stop().style[__keys[x]] = __val[__keys[x]];
+    }
   }
   
+  function loopStyleValue(mapText, data)
+  {
+    var __text = '',
+        __map,
+        __val,
+        __dataFilters = data.filters,
+        x = 0,
+        len = mapText.length;
+
+    for(x;x<len;x++)
+    {
+      __map = mapText[x];
+      if(typeof __map === 'string')
+      {
+        __text += __map;
+      }
+      else
+      {
+        __val = runThroughFilters(typeof __map.value === 'function' ? __map.value() : __map.value, __map.filters.filters, __dataFilters);
+        __text += __val;
+        if(__map.isInsert)
+        {
+          __map.mapText[x] = __val;
+          __map.maps[__map.mapIndex] = __val;
+        }
+      }
+    }
+
+    return __text;
+  }
+
+  function unsetStylePropertyName(map, data)
+  {
+    var __dataFilters = data.filters,
+        __val = runThroughFilters(typeof map.value === 'function' ? map.value() : map.value, map.filters.filters, __dataFilters);
+
+    map.node.style.removeProperty(getFullStylePropertyName(__val));
+  }
+
+  function loopStylePropertyName(map, data)
+  {
+    var __dataFilters = data.filters,
+        __val = runThroughFilters(typeof map.value === 'function' ? map.value() : map.value, map.filters.filters, __dataFilters);
+
+    map.stop().style[__val] = loopStylePropertyValue(map.values, data);
+  }
+
+  function loopStylePropertyValue(mapText, data)
+  {
+    var __text = '',
+        __map,
+        __val,
+        __dataFilters = data.filters,
+        x = 0,
+        len = mapText.length;
+
+    for(x;x<len;x++)
+    {
+      __map = mapText[x];
+      if(typeof __map === 'string')
+      {
+        __text += __map;
+      }
+      else
+      {
+        __val = runThroughFilters(typeof __map.value === 'function' ? __map.value() : __map.value, __map.filters.filters, __dataFilters);
+        __text += __val;
+        if(__map.isInsert)
+        {
+          __map.mapText[x] = __val;
+          __map.maps[__map.mapIndex] = __val;
+        }
+      }
+    }
+
+    return __text;
+  }
+
+  function loopStyleFullProperty(map, data)
+  {
+    var __dataFilters = data.filters,
+        __val = runThroughFilters(typeof map.value === 'function' ? map.value() : map.value, map.filters.filters, __dataFilters);
+        __subValues = loopStylePropertyValue(map.values, data);
+    
+    map.stop().style[__val] = __subValues;
+  }
+
+  function styleDataFullListener(map, data, layer, dbkey)
+  {
+    return function styleDataFullListener(e)
+    {
+      if(typeof e.value === 'function')
+      {
+        /* Remove old listeners */
+        layer.removeEventListener(dbkey + 'update', map.datalistener);
+        removeSubDataListeners(map, data, layer, dbkey);
+        
+        /* bind function to the viewmodel */
+        map.value = (e.value).bind(data);
+        
+        /* Add the new data listeners */
+        layer.addEventListener(dbkey, map.datafunctionlistener);
+        addInnerFunctionListeners(map, data, map.value);
+
+        loopFullStyle(map, data);
+      }
+      else
+      {
+        if(typeof e.value !== 'object') return ERROR_PROPERTYBIND(data, e.value, styleDataFullListener);
+        map.value = e.value;
+
+        if(!e.subchange) addSubDataListeners(map, data, layer, dbkey);
+        loopFullStyle(map, data);
+      }
+    }
+  }
+
+  function styleFunctionFullListener(map, data, layer, dbkey)
+  {
+    return function styleFunctionFullListener(e)
+    {
+      if(typeof e.value !== 'function')
+      {
+        /* Remove listeners */
+        removeInnerFunctionListeners(map, data, map.value);
+        layer.removeEventListener(dbkey, map.datafunctionlistener);
+        
+        /* Add new data listeners */
+        addSubDataListeners(map, data, layer, dbkey);
+        layer.addEventListener(dbkey + 'update', map.datalistener);
+        
+        /* set the dom property */
+        map.value = e.value;
+
+        loopFullStyle(map, data);
+      }
+      else
+      {
+        /* Remove inner listeners */
+        removeInnerFunctionListeners(map, data, map.value);
+        
+        /* bind the new function to the viewmodel */
+        map.value = (e.value).bind(data);
+        
+        /* add new inner listeners */
+        addInnerFunctionListeners(map, data, map.value);
+
+        loopFullStyle(map, data);
+      }
+    }
+  }
+
+  function styleDataListener(map, data, layer, dbkey)
+  {
+    var __mapText = map.mapText;
+    return function styleDataListener(e)
+    {
+      if(typeof e.value === 'function')
+      {
+        /* Remove old listeners */
+        layer.removeEventListener(dbkey + 'update', map.datalistener);
+        
+        /* bind function to the viewmodel */
+        map.value = (e.value).bind(data);
+        
+        /* Add the new data listeners */
+        layer.addEventListener(dbkey, map.datafunctionlistener);
+        addInnerFunctionListeners(map, data, map.value);
+
+        map.stop().style[map.property] = loopStyleValue(__mapText, data);
+      }
+      else
+      {
+        map.value = e.value;
+        map.stop().style[map.property] = loopStyleValue(__mapText, data);
+      }
+    }
+  }
+
+  function styleFunctionListener(map, data, layer, dbkey)
+  {
+    var __mapText = map.mapText;
+    return function styleFunctionListener(e)
+    {
+      if(typeof e.value !== 'function')
+      {
+        /* Remove listeners */
+        removeInnerFunctionListeners(map, data, map.value);
+        layer.removeEventListener(dbkey, map.datafunctionlistener);
+        
+        /* Add new data listeners */
+        layer.addEventListener(dbkey + 'update', map.datalistener);
+        
+        /* set the dom property */
+        map.value = e.value;
+
+        map.stop().style[map.property] = loopStyleValue(__mapText, data);
+      }
+      else
+      {
+        /* Remove inner listeners */
+        removeInnerFunctionListeners(map, data, map.value);
+        
+        /* bind the new function to the viewmodel */
+        map.value = (e.value).bind(data);
+        
+        /* add new inner listeners */
+        addInnerFunctionListeners(map, data, map.value);
+
+        map.stop().style[map.property] = loopStyleValue(__mapText, data);
+      }
+    }
+  }
+
+  function stylePropDataListener(map, data, layer, dbkey)
+  {
+    return function stylePropDataListener(e)
+    {
+      unsetStylePropertyName(map, data);
+      if(typeof e.value === 'function')
+      {
+        /* Remove old listeners */
+        layer.removeEventListener(dbkey + 'update', map.datalistener);
+        
+        /* bind function to the viewmodel */
+        map.value = (e.value).bind(data);
+        
+        /* Add the new data listeners */
+        layer.addEventListener(dbkey, map.datafunctionlistener);
+        addInnerFunctionListeners(map, data, map.value);
+
+        loopStylePropertyName(map, data);
+      }
+      else
+      {
+        map.value = e.value;
+        loopStylePropertyName(map, data);
+      }
+    }
+  }
+
+  function stylePropFunctionListener(map, data, layer, dbkey)
+  {
+    return function stylePropFunctionListener(e)
+    {
+      if(typeof e.value !== 'function')
+      {
+        /* Remove listeners */
+        removeInnerFunctionListeners(map, data, map.value);
+        layer.removeEventListener(dbkey, map.datafunctionlistener);
+        
+        /* Add new data listeners */
+        layer.addEventListener(dbkey + 'update', map.datalistener);
+        
+        /* set the dom property */
+        map.value = e.value;
+
+        loopStylePropertyName(map, data);
+      }
+      else
+      {
+        /* Remove inner listeners */
+        removeInnerFunctionListeners(map, data, map.value);
+        
+        /* bind the new function to the viewmodel */
+        map.value = (e.value).bind(data);
+        
+        /* add new inner listeners */
+        addInnerFunctionListeners(map, data, map.value);
+
+        loopStylePropertyName(map, data);
+      }
+    }
+  }
+
+  function styleFullPropDataListener(map, data, layer, dbkey)
+  {
+    return function styleFullPropDataListener(e)
+    {
+      if(typeof e.value === 'function')
+      {
+        /* Remove old listeners */
+        layer.removeEventListener(dbkey + 'update', map.datalistener);
+        removeSubDataListeners(map, data, layer, dbkey);
+        
+        /* bind function to the viewmodel */
+        map.value = (e.value).bind(data);
+        
+        /* Add the new data listeners */
+        layer.addEventListener(dbkey, map.datafunctionlistener);
+        addInnerFunctionListeners(map, data, map.value);
+
+        loopStyleFullProperty(map, data);
+      }
+      else
+      {
+        map.value = e.value;
+        loopStyleFullProperty(map, data);
+      }
+    }
+  }
+
+  function styleFullPropFunctionListener(map, data, layer, dbkey)
+  {
+    return function styleFullPropFunctionListener(e)
+    {
+      if(typeof e.value !== 'function')
+      {
+        /* Remove listeners */
+        removeInnerFunctionListeners(map, data, map.value);
+        layer.removeEventListener(dbkey, map.datafunctionlistener);
+        
+        /* Add new data listeners */
+        addSubDataListeners(map, data, layer, dbkey);
+        layer.addEventListener(dbkey + 'update', map.datalistener);
+        
+        /* set the dom property */
+        map.value = e.value;
+
+        loopStyleFullProperty(map, data);
+      }
+      else
+      {
+        /* Remove inner listeners */
+        removeInnerFunctionListeners(map, data, map.value);
+        
+        /* bind the new function to the viewmodel */
+        map.value = (e.value).bind(data);
+        
+        /* add new inner listeners */
+        addInnerFunctionListeners(map, data, map.value);
+
+        loopStyleFullProperty(map, data);
+      }
+    }
+  }
+
   /* ATTRIBUTE NAME */
   function handleAttr(map, data)
   {
@@ -1640,1141 +2059,6 @@ window.kaleoi = (function(){
   {
     
   }
-  /* ENDREGION */
-  
-  
-  /* TODO: replace with map type equivelants */
-  function runThroughMaps(mapText, data)
-  {
-    var __map,
-        __text = '',
-        __value,
-        __values,
-        len = mapText.length,
-        x = 0;
-    
-    for(x;x<len;x++)
-    {
-      __map = mapText[x];
-      
-      if(typeof __map === 'string')
-      {
-        __text += __map;
-      }
-      else if(__map.value !== undefined)
-      {
-        if(__map.values.length)
-        {
-          __values = runThroughValueMaps(__map, data);
-          if(typeof __map.value === 'function')
-          {
-            __value = parseAttrNameReturn(__map.value.call(data, __values), __values);
-          }
-          else
-          {
-            __value = parseAttrNameReturn(__map.value, __values);
-          }
-          __value = runThroughFilters(__value, __map.filters.filters, data.filters);
-          __text += (__value[0] + ':' + __value[1] + ';');
-        }
-        else if(__map.isFullStyle)
-        {
-          __value = (typeof __map.value === 'function' ? __map.value() : __map.value);
-          if(typeof __value !== 'object')
-          {
-            console.error(new Error('A full class stylesheet bind must return an object of styles'))
-            __value = '';
-          }
-          else
-          {
-            __value = parseAttrNameReturn(runThroughFilters(__value, __map.filters.filters, data.filters));
-            __text += (__map.isInlineStyle ? __value[1] : (__value[0] + ':' + __value[1] + ';'));
-          }
-        }
-        else if(__map.isFullProp)
-        {
-          __value = (typeof __map.value === 'function' ? __map.value() : __map.value);
-          if(typeof __value !== 'object')
-          {
-            console.error(new Error('A full property stylesheet bind must return an object of style name and value'))
-            __value = '';
-          }
-          else
-          {
-            __value = parseAttrNameReturn(__value, '');
-          }
-          __value = runThroughFilters(__value, __map.filters.filters, data.filters);
-          __text += (__map.isInlineStyle ? __value[1] : (__value[0] + ':' + __value[1]));
-        }
-        else
-        {
-          __value = (typeof __map.value === 'function' ? __map.value() : __map.value);
-          __text += runThroughFilters(__value, __map.filters.filters, data.filters);
-        }
-        if(__map.type === 'insert')
-        {
-          mapText[x] = runThroughFilters(__value, __map.filters.filters, data.filters)
-        }
-      }
-    }
-    return __text;
-  }
-  
-  function runThroughValueMaps(map, data)
-  {
-    var __values = map.values,
-        __map,
-        __text = '',
-        __value,
-        len = __values.length,
-        x = 0;
-    
-    for(x;x<len;x++)
-    {
-      __map = __values[x];
-      
-      if(typeof __map === 'string')
-      {
-        __text += __map;
-      }
-      else
-      {
-        if(!__map.value) __map.value = data.get(__map.key);
-        __value = (typeof __map.value === 'function' ? __map.value() : __map.value);
-        __text += runThroughFilters(__value, __map.filters.filters, data.filters);
-        if(__map.type === 'insert') {
-          __values[x] = __value;
-          __map.maps.splice(__map.mapIndex, 1);
-        }
-      }
-    }
-    
-    return __text;
-  }
-  
-  function handleMaps__old(map, data)
-  {
-    /*see map types in locals */
-    var mapType = __mapTypes.indexOf(map.type);
-    
-    /* overwrite data with stored data if was used */
-    storageHelper(map.key, map.filters, data);
-    
-    map.value = data.get(map.key);
-    
-    if(!map.value) return (!!console.error('Component: ' + data.name, new Error('You are missing the viewmodel property of ' + map.key)));
-    
-    if(!map.stop)
-    {
-      /* set stop bind method, (stops updates to prevent stack overflow) */
-      map.stop = ((map.local && map.local.stop) ? map.local : ({ stop: function(){
-        map.node.stop();
-        return map.local;
-      }}));
-    }
-    
-    switch(mapType)
-    {
-      case 0:
-        map.local[map.localAttr] = loopStandardMaps(map.mapText, data);
-        if(!map.isInsert)
-        {
-          data.addEventListener(map.key, ((typeof map.value === 'function') ? DataFunctionListener(map, data) : DataListener(map, data)));
-          
-          if(!map.isDirty)
-          {
-            map.node.addEventListener(map.property, ((typeof map.value === 'function') ? DomFunctionListener(map, data) : DomListener(map, data)))
-          }
-        }
-        return;
-      case 1:
-        if(typeof map.value !== 'function') return (!!console.error('Component: ' + data.name, new Error(map.key + ' is attempting to bind to an event but is not a function')))
-        if(map.isInsert)
-        {
-          map.node[map.property] = map.value;
-        }
-        else
-        {
-          map.node[map.property] = map.value;
-          data.addEventListener(map.key, DataEventListener(map, data));
-          map.node.addEventListener(map.property, DomEventListener(map, data));
-        }
-        return;
-      case 2:
-        return stylesheet(map, data);
-      case 3:
-        return style(map, data);
-    }
-  }
-  
-  /* MAP TYPES */
-  function insert(map, data)
-  {
-    var __key = map.key,
-        __filters = map.filters,
-        __item;
-    
-    /* overwrite data with stored data if was used */
-    storageHelper(__key, __filters, data);
-    
-    map.value = data.get(__key);
-    
-    if(!map.value) return (!!console.error('Component: ' + data.name, new Error('You are missing the binding property of ' + __key)));
-    
-    if(map.property === 'style')
-    {
-      if(map.isFullStyle)
-      {
-        var __val = (typeof map.value === 'function' ? map.value() : map.value),
-            __keys = Object.keys((__val || {})),
-            len = __keys.length,
-            x = 0;
-        
-        for(x;x<len;x++)
-        {
-          map.local[__keys[x]] = runThroughFilters(__val[__keys[x]], map.filters.filters, data.filters);
-        }
-      }
-      else if(map.isFullProp)
-      {
-        
-      }
-      else if(map.values.length)
-      {
-        __val = runThroughValueMaps(map, data),
-        __item = parseAttrNameReturn(typeof map.value === 'function' ? map.value(__val) : map.value, __val);
-        /* VALUE AND TEXT INSERT */
-        map.local[__item[0]] = __item[1];
-      }
-      else
-      {
-        /* VALUE AND TEXT INSERT */
-        map.local[map.localKey] = (typeof map.value === 'function' ? map.value() : map.value);
-      }
-    }
-    else
-    {
-      map.local[map.localAttr] = runThroughMaps(map.mapText, data);
-    }
-  }
-  
-  function stylesheet(map, data)
-  {
-    var __key = map.key,
-        __filters = map.filters;
-    
-    /* overwrite data with stored data if was used */
-    storageHelper(__key, __filters, data);
-    
-    map.value = data.get(__key);
-    
-    if(!map.value) return (!!console.error('Component: ' + data.name, new Error('You are missing the binding property of ' + __key)));
-    /* VALUE AND TEXT INSERT */
-    map.local[map.localAttr] = runThroughMaps(map.mapText, data);
-    if(typeof map.value === 'function')
-    {
-      bindFunction(map, data);
-    }
-    else
-    {
-      bindData(map, data);
-    }
-    if(map.values.length) bindValuesData(__key, map, data);
-  }
-  
-  function style(map, data)
-  {
-    var __key = map.key,
-        __filters = map.filters,
-        __keys = [],
-        __val,
-        __item,
-        len,
-        x = 0;
-    
-    /* overwrite data with stored data if was used */
-    storageHelper(__key, __filters, data);
-    
-    map.value = data.get(__key);
-    
-    if(!map.value) return (!!console.error('Component: ' + data.name, new Error('You are missing the binding property of ' + __key)));
-    if(map.isFullStyle)
-    {
-      __val = (typeof map.value === 'function' ? map.value() : map.value)
-      __keys = Object.keys((__val || {}));
-      len = __keys.length;
-      for(x;x<len;x++)
-      {
-        __item = __val[__keys[x]];
-        map.local[__keys[x]] = runThroughFilters(__item, map.filters.filters, data.filters);
-        if(typeof map.value === 'function')
-        {
-          bindFunction(map, data, __keys[x]);
-          bindDomFunction(map, data, __keys[x]);
-        }
-        else
-        {
-          bindData(map, data, __keys[x]);
-          bindDom(map, data, __keys[x])
-        }
-      }
-    }
-    else if(map.values.length || map.isFullProp)
-    {
-      __val = (map.isFullProp ? '' : runThroughValueMaps(map, data));
-      __item = parseAttrNameReturn(typeof map.value === 'function' ? map.value(__val) : map.value, __val);
-      
-      /* VALUE AND TEXT INSERT */
-      map.local[__item[0]] = __item[1];
-      
-      bindProperty(map, data);
-    }
-    else
-    {
-      /* VALUE AND TEXT INSERT */
-      map.local[map.localKey] = (typeof map.value === 'function' ? map.value() : map.value);
-      if(typeof map.value === 'function')
-      {
-        bindFunction(map, data, map.localKey);
-        bindDomFunction(map, data, map.localKey);
-      }
-      else
-      {
-        bindData(map, data, map.localKey);
-        bindDom(map, data, map.localKey)
-      }
-    }
-  }
-  
-  /* ENDREGION */
-  
-  /* BIND HELPERS */
-  /* REGION */
-  
-  /* adds all sub required listeners for style/attr property names */
-  function addObjectPropertyListeners(map, data)
-  {
-    var __layer,
-        __key,
-        __value = data.get(map.key),
-        __isFunction,
-        __isDataObject = (__value && typeof __value === 'object'),
-        maps = map.mapValues,
-        item,
-        prop = map.valueProp,
-        len = maps.length,
-        x = 0;
-    for(x;x<len;x++)
-    {
-      item = maps[x];
-      __layer = data.getLayer(item.key);
-      __key = getKey(item.key);
-      __value = __layer[__key];
-      __isFunction = (typeof __value === 'function');
-      
-      /* set item.datalistener */
-      item.datalistener = (__isFunction ? DataFunctionListener(map, data, __value) : DataListener(map, data, __value));
-      __layer.addEventListener(__key + (__isFunction ? '' : 'update'), item.datalistener);
-      if(!item.isDirty)
-      {
-        /* set item.domlistener */
-        map.domlistener = DomListener(map, data);
-        map.node.addEventListener(prop + (__isFunction ? '' : 'update'), map.domlistener);
-      }
-    }
-    if(!maps || !maps.length)
-    {
-      /* set item.domlistener */
-      map.domlistener = DomListener(map, data);
-      map.node.addEventListener(prop + 'update', map.domlistener);
-    }
-    if(__isDataObject)
-    {
-      /* set map.secondlistener */
-      map.secondlistener = DataPropertyValueListener(map);
-      data.get(map.key).addEventListener('*update', map.secondlistener);
-    }
-  }
-  
-  /* removes all sub required listeners for style/attr property names */
-  function removeObjectPropertyListeners(map, data)
-  {
-    var maps = map.mapValues,
-        item,
-        prop = map.valueprop,
-        len = maps.length,
-        x = 0;
-    for(x;x<len;x++)
-    {
-      item = maps[x];
-      data.removeEventListener(item.key, item.datalistener);
-      if(!item.isDirty) map.node.removeEventListener(prop, item.domlistener);
-      item.datalistener = undefined;
-      item.domlistener = undefined;
-    }
-    if(map.domlistener)
-    {
-      map.node.removeEventListener(prop, map.domlistener);
-      map.domlistener = undefined;
-    }
-    if(map.secondlistener)
-    {
-      data.get(map.key).removeEventListener('*update', map.secondlistener);
-      map.secondlistener = undefined;
-    }
-  }
-  
-  /* ENDREGION */
-  
-  /* DATA LISTENERS (FOR UPDATING THE DOM) */
-  /* REGION */
-  
-  /* this is meant for simple data binds */
-  function DataListener(map, data, key)
-  {
-    return function(e)
-    {
-      if(typeof e.value === 'function')
-      {
-        data.removeEventListener(map.key + 'update', map.datalistener);
-        if(!map.isDirty) map.node.removeEventListener((key || map.localAttr) + 'update', map.domlistener);
-        map.value = (e.value).bind(data);
-
-        /* Set new listeners */
-        map.datalistener = DataFunctionListener(map, data, key);
-        data.addEventListener(map.key, map.datalistener);
-        addInnerFunctionListeners(map, data, map.value);
-        map.stop()[(key || map.localAttr)] = runThroughMaps(map.mapText, data);
-        if(!map.isDirty)
-        {
-          map.domlistener = DomFunctionListener(map, data, key);
-          map.node.addEventListener((key || map.localAttr), map.domlistener);
-        }
-      }
-      else
-      {
-        map.value = e.value;
-        map.stop()[(key || map.localAttr)] = runThroughMaps(map.mapText, data);
-      }
-    }
-  }
-  
-  /* This is meant for simple compute function binds */
-  function DataFunctionListener(map, data, key)
-  {
-    return function(e)
-    {
-      if(typeof e.value !== 'function')
-      {
-        removeInnerFunctionListeners(map, data, map.value);
-        data.removeEventListener(map.key, map.datalistener);
-        if(!map.isDirty) map.node.removeEventListener((key || map.localAttr), map.domlistener);
-        
-        /* Set new listeners */
-        map.datalistener = DataListener(map, data, key);
-        data.addEventListener(map.key + 'update', map.datalistener);
-        if(!map.isDirty)
-        {
-          map.domlistener = DomListener(map, data, key);
-          map.node.addEventListener((key || map.localAttr) + 'update', map.domlistener);
-        }
-        map.stop()[(key || map.localAttr)] = runThroughMaps(map.mapText, data);
-      }
-      else
-      {
-        removeInnerFunctionListeners(map, data, map.value);
-        map.value = (e.value).bind(data);
-        addInnerFunctionListeners(map, data, map.value);
-        map.stop()[(key || map.localAttr)] = runThroughMaps(map.mapText, data);
-      }
-    }
-  }
-  
-  function DataEventListener(map, data)
-  {
-    return function(e)
-    {
-      map.value = e.value.bind(data);
-      map.stop()[map.localAttr] = map.value;
-    }
-  }
-  
-  /* This is meant for attr/style property name binds and their values */
-  function DataPropertyListener(map, data)
-  {
-    var __mapValue = map.value,
-        __val,
-        __value,
-        __obj;
-    
-    if(!map.stop)
-    {
-      /* set stop bind method, (stops updates to prevent stack overflow) */
-      map.stop = ((map.local && map.local.stop) ? map.local : ({ stop: function(){
-        map.node.stop();
-        return map.local;
-      }}));
-    }
-    
-    /* initial value set */
-    if(typeof __mapValue === 'function')
-    {
-      __val = runThroughValueMaps(map, data);
-      __value = __mapValue(__val);
-    }
-    else
-    {
-      __value = (typeof __mapValue !== 'object' ? [__mapValue, ''] : __mapValue);
-    }
-    
-    /* throw error if the value is not an object */
-    ERROR_PROPERTYBIND(data, __value, __mapValue);
-    
-    __obj = parseAttrNameReturn(__value, __val);
-    map.valueprop = __obj[0];
-    addObjectPropertyListeners(map, data);
-    setDomByPropValueArray(map, data, __obj);
-    
-    return function(e)
-    {
-      if(e.key !== getKey(map.key))
-      {
-        /* This is a object sub property, value was already mutated on map */
-        return setDomByPropValueArray(map, data, parseAttrNameReturn(map.value));
-      }
-      
-      /* if the value is undefined we delete the style or attribute */
-      if(e.value)
-      {
-        if(typeof e.value === 'object')
-        {
-          map.value = e.value;
-          __obj = parseAttrNameReturn(map.value);
-          map.valueprop = __obj[0];
-          
-          return setDomByPropValueArray(map, data, __obj);
-        }
-        else if(typeof e.value === 'function')
-        {
-          /* Remove previous object based listeners */
-          removeObjectPropertyListeners(map, data);
-          
-          map.value = (e.value).bind(data);
-          
-          /* get any associated values to pass into the function */
-          __val = runThroughValueMaps(map, data);
-          __value = map.value(__val);
-          
-          /* throw error if the value is not an object */
-          ERROR_PROPERTYBIND(data, __value, map.value);
-          
-          __obj = parseAttrNameReturn(__value, __val);
-          map.valueprop = __obj[0];
-          
-          addObjectPropertyListeners(map, data);
-          
-          return setDomByPropValueArray(map, data, __obj);
-        }
-        else
-        {
-          /* Remove previous object based listeners */
-          removeObjectPropertyListeners(map, data);
-          
-          map.value = [e.value, ''];
-          map.valueprop = e.value;
-          
-          /* re add property listeners */
-          addObjectPropertyListeners(map, data);
-          /* update as an empty string */
-          return setDomByPropValueArray(map, data, map.value);
-        }
-      }
-      else
-      {
-        /* Remove previous object based listeners */
-        removeObjectPropertyListeners(map, data);
-        
-        return setDomByPropValueArray(map, data, undefined);
-      }
-    }
-  }
-  
-  /* This is meant for listening to changes on a attr/style property name binds data sub object properties eg: {prop:value} or [prop, value] */
-  function DataPropertyValueListener(map)
-  {
-    return function(e)
-    {
-      e.value = map.value;
-      return map.datalistener.call(this, e);
-    }
-  }
-  
-  /* This is meant for object binds such as full style objects */
-  function DataObjectListener(map, data, value)
-  {
-    return function(e)
-    {
-      
-    }
-  }
-  
-  /* this is meant for a simple non dirty dom data bind */
-  function DomListener(map, data, key, layer, dbkey)
-  {
-    var __layer = (layer || data.findLayer(map.key)),
-        __key = (dbkey || getKey(map.key));
-    
-    return function(e)
-    {
-      if(typeof e.value === 'function')
-      {
-        data.removeEventListener(map.key + 'update', map.datalistener);
-        map.node.removeEventListener((key || map.localAttr) + 'update', map.domlistener);
-        map.value = (e.value).bind(data);
-        __layer.stop()[__key] = map.value;
-        
-        /* Set new listeners */
-        map.datalistener = DataFunctionListener(map, data, key);
-        data.addEventListener(map.key, map.datalistener);
-        addInnerFunctionListeners(map, data, map.value);
-        
-        /* overwrite function */
-        map.stop()[(key || map.localAttr)] = runThroughMaps(map.mapText, data);
-        map.domlistener = DomFunctionListener(map, data, key, __layer, __key);
-        map.node.addEventListener((key || map.localAttr), map.domlistener);
-      }
-      else
-      {
-        map.value = e.value;
-        __layer.stop()[__key] = e.value;
-      }
-    }
-  }
-  
-  /* this is meant for a simple non dirty dom compute function bind */
-  function DomFunctionListener(map, data, key, layer, dbkey)
-  {
-    var __layer = (layer || data.findLayer(map.key)),
-        __key = (dbkey || getKey(map.key));
-    
-    return function(e)
-    {
-      if(typeof e.value !== 'function')
-      {
-        removeInnerFunctionListeners(map, data, map.value);
-        data.removeEventListener(map.key, map.datalistener);
-        map.node.removeEventListener((key || map.localAttr), map.domlistener);
-        
-        map.value = e.value;
-        __layer.stop()[__key] = map.value;
-        
-        map.datalistener = DataListener(map, data, key);
-        data.addEventListener(map.key + 'update', map.datalistener);
-        
-        map.domlistener = DomListener(map, data, key, __layer, __key);
-        map.node.addEventListener((key || map.localAttr), map.domlistener);
-      }
-      else
-      {
-        removeInnerFunctionListeners(map, data, map.value);
-        map.value = (e.value).bind(data);
-        __layer.stop()[__key] = map.value;
-        addInnerFunctionListeners(map, data, map.value);
-        
-        map.stop()[(key || map.localAttr)] = runThroughMaps(map.mapText, data);
-      }
-    }
-  }
-  
-  function DomEventListener(map, data, layer, dbkey)
-  {
-    var __layer = (layer || data.findLayer(map.key)),
-        __key = (dbkey || getKey(map.key));
-    
-    return function(e)
-    {
-      map.value = runThroughFilters(e.value, map.filters.vm, data.filters).bind(data);
-      __layer.stop()[__key] = map.value;
-    }
-  }
-  
-  /* ENDREGION */
-  
-  /* HELPERS FOR SETTING THE DOM */
-  /* REGION */
-  
-  /* meant for property and value pair */
-  function setDomByPropValueArray(map, data, value)
-  {
-    if(!value)
-    {
-      if(map.isInlineStyle)
-      {
-        map.stop()[map.valueprop] = '';
-      }
-      else
-      {
-        map.stop().removeAttribute(map.valueprop);
-      }
-    }
-    else
-    {
-      if(map.isInlineStyle)
-      {
-        map.stop()[value[0]] = value[1];
-      }
-      else
-      {
-        map.stop().setAttribute(value[0], value[1]);
-      }
-    }
-  }
-  
-  function setDomByObject(map, data, value)
-  {
-    
-  }
-  
-  /* ENDREGION */
-  
-  /* HANDLING BINDS */
-  /* REGION */
-  
-  /* ATTR/STYLE PROPERTY NAME BINDINGS */
-  /* REGION */
-  
-  function addInnerPropertyValueListeners(map, data, property)
-  {
-    var isEvent = (__EventList__.indexOf(property) !== -1),
-        __values = map.values,
-        __item,
-        __key,
-        __filters,
-        __hasMap = false,
-        len = __values.length,
-        x = 0;
-    
-    if(!len)
-    {
-      map.subvaluetextlistener = function(e)
-      {
-        if(typeof map.value !== 'function')
-        {
-          if(map.value.length)
-          {
-            map.value.stop()[1] = e.value;
-          }
-          else
-          {
-            var keys = Object.keys(map.value);
-            map.value.stop()[keys[0]] = e.value;
-          }
-        }
-        else
-        {
-          if(map.values.length) map.values[map.values.indexOf(e.oldValue)] = e.value;
-        }
-        e.value = map.value;
-        return map.datalistener.call(data, e);
-      }
-      map.node.addEventListener(property, map.subvaluetextlistener);
-    }
-    else
-    {
-      for(x;x<len;x++)
-      {
-        __item = __values[x];
-        if(typeof __item === 'object')
-        {
-          __hasMap = true;
-          __item.localAttr = property;
-          __item.isEvent = isEvent;
-          __key = __item.key;
-          __filters = __item.filters;
-
-          /* overwrite data with stored data if was used */
-          storageHelper(__key, __filters, data);
-
-          __item.value = data.get(__key);
-
-          /* VALUE AND TEXT INSERT */
-          __item.local[__item.localAttr] = runThroughMaps(__item.mapText, data);
-          if(typeof __item.value === 'function' && !__item.isEvent)
-          {
-            bindFunction(__item, data);
-            if(!__item.isDirty) bindDomFunction(__item, data, property);
-          }
-          else
-          {
-            bindData(__item, data);
-            if(!__item.isDirty) bindDom(__item, data, property);
-          }
-        }
-      }
-      if(!__hasMap)
-      {
-        map.subvaluetextlistener = function(e)
-        {
-          if(typeof map.value !== 'function')
-          {
-            if(map.value.length)
-            {
-              map.value.stop()[1] = e.value;
-            }
-            else
-            {
-              var keys = Object.keys(map.value);
-              map.value.stop()[keys[0]] = e.value;
-            }
-          }
-          else
-          {
-            if(map.values.length) map.values[map.values.indexOf(e.oldValue)] = e.value;
-          }
-          e.value = map.value;
-          return map.datalistener.call(data, e);
-        }
-        map.node.addEventListener(property, map.subvaluetextlistener);
-      }
-    }
-  }
-  
-  function removeInnerPropertyValueListeners(map, data, property)
-  {
-    var __values = map.values,
-        __item,
-        len = __values.length,
-        x = 0;
-    for(x;x<len;x++)
-    {
-      __item = __values[x];
-      if(typeof __item === 'object')
-      {
-        if(typeof __item.value === 'function' && !__item.isEvent)
-        {
-          removeBindFunction(__item, data);
-          if(!__item.isDirty) removeBindDomFunction(__item, data, __item.localAttr);
-        }
-        else
-        {
-          removeBindData(__item, data);
-          if(!__item.isDirty) removeBindDom(__item, data, __item.localAttr);
-        }
-      }
-    }
-    
-    if(map.subvaluetextlistener)
-    {
-      map.node.removeEventListener(property, map.subvaluetextlistener);
-    }
-  }
-  
-  function bindProperty(map, data)
-  {
-    var __layer = data.findLayer(map.key),
-        __key = getKey(map.key),
-        __value = (__layer && __layer[__key]),
-        __local = ((map.local && map.local.stop) ? map.local : ({ stop: function(){
-          map.node.stop();
-          return map.local;
-        }})),
-        __val = runThroughValueMaps(map, data),
-        __isFunc = (typeof __value === 'function'),
-        __item = parseAttrNameReturn(__isFunc ? map.value(__val) : map.value, __val);
-    
-    function listener(e)
-    {
-      removeBindProperty(map, data);
-      map.value = e.value;
-      __val = runThroughValueMaps(map, data);
-      __item = parseAttrNameReturn((typeof map.value === 'function') ? map.value(__val) : map.value, __val);
-      if(map.isInlineStyle)
-      {
-        __local.stop()[__item[0]] = __item[1];
-      }
-      else
-      {
-        map.node.stop().setAttribute(__item[0], __item[1]);
-      }
-      bindProperty(map, data);
-    }
-    
-    function sublistener(e)
-    {
-      e.value = map.value;
-      return map.datalistener.call(this, e);
-    }
-    
-    if(__isFunc)
-    {
-      map.funclistener = listener
-      map.datalistener = listener
-      __layer.addEventListener(__key,map.funclistener);
-      addInnerFunctionListeners(map, data, map.value);
-    }
-    else
-    {
-      map.datalistener = listener
-      __layer.addEventListener(__key+'update',map.datalistener);
-      if(typeof __layer[__key] === 'object')
-      {
-        map.sublistener = sublistener;
-        __layer[__key].addEventListener('*update', map.sublistener);
-      }
-    }
-    addInnerPropertyValueListeners(map, data, __item[0]);
-  }
-  
-  function removeBindProperty(map, data)
-  {
-    var __layer = data.findLayer(map.key),
-        __key = getKey(map.key),
-        __value = (__layer && __layer[__key]),
-        __val = runThroughValueMaps(map, data),
-        __isFunc = (typeof __value === 'function'),
-        __item = parseAttrNameReturn(__isFunc ? map.value(__val) : map.value, __val);
-    
-    removeInnerPropertyValueListeners(map, data, __item[0]);
-    if(__isFunc)
-    {
-      removeInnerFunctionListeners(map, data, map.value);
-      __layer.removeEventListener(__key, map.funclistener);
-    }
-    else
-    {
-      __layer.removeEventListener(__key+'update', map.datalistener);
-      if(typeof __layer[__key] === 'object') __layer[__key].removeEventListener('*update', map.sublistener);
-    }
-    
-    if(map.isInlineStyle)
-    {
-      map.local[__item[0]] = '';
-    }
-    else
-    {
-      map.node.removeAttribute(__item[0]);
-    }
-  }
-  
-  /* ENDREGION */
-  
-  /* FUNCTION BINDS */
-  /* REGION */
-  
-  function bindFunction(map, data, key)
-  {
-    var __layer = data.findLayer(map.key),
-        __key = getKey(map.key),
-        __value = (__layer && __layer[__key]),
-        __local = ((map.local && map.local.stop) ? map.local : ({ stop: function(){
-          map.node.stop();
-          return map.local;
-        } }));
-    
-    map.funclistener = function(e)
-    {
-      /* if the value changes to a standard, then this bind is no longer computed */
-      if(typeof e.value !== 'function')
-      {
-        /* remove binds */
-        if(!map.isDirty) removeBindDomFunction(map, data, key);
-        removeBindFunction(map, data);
-        
-        map.value = e.value;
-        
-        /* change to non computed */
-        bindData(map, data, key);
-        if(!map.isDirty) bindDom(map, data, key);
-        
-        /* refresh values */
-        __local.stop()[(key || map.localAttr)] = runThroughMaps(map.mapText, data);
-      }
-      else
-      {
-        removeInnerFunctionListeners(map, data, map.value);
-        addInnerFunctionListeners(map, data, e.value);
-        map.value = e.value.bind(data);
-        __local.stop()[(map.localAttr || key)] = runThroughMaps(map.mapText, data);
-      }
-    }
-    
-    map.datalistener = function()
-    {
-      __local.stop()[(key || map.localAttr)] = runThroughMaps(map.mapText, data);
-    }
-    
-    __layer.addEventListener(__key,map.funclistener);
-    addInnerFunctionListeners(map, data, map.value);
-  }
-  
-  function removeBindFunction(map, data)
-  {
-    var __layer = data.findLayer(map.key),
-        __key = getKey(map.key);
-    
-    __layer.removeEventListener(__key,map.funclistener);
-    removeInnerFunctionListeners(map, data, map.value);
-  }
-  
-  function bindDomFunction(map, data, key)
-  {
-    map.domlistener = function(e)
-    {
-      /* if the value changes to a standard, then this bind is no longer computed */
-      if(typeof e.value !== 'function')
-      {
-        /* remove binds */
-        removeBindDomFunction(map, data, key);
-        removeBindFunction(map, data);
-        
-        data.stop().set(map.key, runThroughFilters(e.value, map.filters.vmFilters, data.filters));
-        map.value = data.get(map.key);
-        
-        /* change to non computed */
-        bindData(map, data, key);
-        bindDom(map, data, key);
-      }
-      else
-      {
-        e.preventDefault();
-        removeInnerFunctionListeners(map, data, map.value);
-        addInnerFunctionListeners(map, data, e.value);
-        map.value = e.value.bind(data);
-        data.stop().set(map.key, runThroughFilters(e.value, map.filters.vmFilters, data.filters));
-      }
-    }
-    
-    map.node.addEventListener((key || map.listener), map.domlistener);
-  }
-  
-  function removeBindDomFunction(map, data, key)
-  {
-    map.node.removeEventListener((key || map.listener), map.domlistener);
-  }
-  
-  /* ENDREGION */
-  
-  /* STANDARD PROPERTY BINDS */
-  /* REGION */
-  
-  function bindData(map, data, key)
-  {
-    var __layer = data.findLayer(map.key),
-        __key = getKey(map.key),
-        __local = ((map.local && map.local.stop) ? map.local : ({ stop: function(){ 
-          map.node.stop();
-          return map.local;
-        } }));
-    
-    map.datalistener = function(e)
-    {
-      /* If value was set as a function then we need to change this to a computed bind */
-      if(typeof e.value === 'function' && !map.isEvent)
-      {
-        if(!map.isDirty) removeBindDom(map, data, key);
-        removeBindData(map, data, key);
-        
-        map.value = e.value.bind(data);
-        
-        /* change to computed */
-        bindFunction(map, data, key);
-        bindDomFunction(map, data, key);
-        
-        __local.stop()[(key || map.localAttr)] = runThroughMaps(map.mapText, data);
-      }
-      else
-      {
-        map.value = e.value;
-        __local.stop()[(key || map.localAttr)] = (map.type === 'event' ? map.value : runThroughMaps(map.mapText, data));
-      }
-    }
-    
-    __layer.addEventListener(__key + "update",map.datalistener);
-    if(__layer[__key] && typeof __layer[__key] === 'object')
-    {
-      map.sublistener = function(e)
-      {
-        e.value = map.value;
-        return map.datalistener.call(this, e);
-      }
-      
-      __layer[__key].addEventListener('*update', map.sublistener);
-    }
-  }
-  
-  function removeBindData(map, data)
-  {
-    var __layer = data.findLayer(map.key),
-        __key = getKey(map.key);
-    
-    __layer.removeEventListener(__key + "update",map.datalistener);
-  }
-  
-  function bindDom(map, data, key)
-  {
-    var __local = ((map.local && map.local.stop) ? map.local : { stop: function(){ return map.local } });
-    
-    map.domlistener = function(e)
-    {
-      /* If value was set as a function then we need to change this to a computed bind */
-      if(typeof e.value === 'function' && !map.isEvent)
-      {
-        /* remove old binds */
-        e.preventDefault();
-        removeBindDom(map, data, key);
-        removeBindData(map, data, key);
-        data.stop().set(map.key, runThroughFilters(map.value, map.filters.vmFilters, data.filters));
-        map.value = data.get(map.key).bind(data);
-        
-        /* change to computed */
-        bindFunction(map, data, key);
-        bindDomFunction(map, data, key);
-        
-        /* refresh values */
-        __local.stop()[(map.localAttr || key)] = runThroughMaps(map.mapText, data);
-      }
-      else
-      {
-        map.value = e.value;
-        data.stop().set(map.key, runThroughFilters(e.value, map.filters.vmFilters, data.filters));
-      }
-    }
-    
-    map.node.addEventListener((key || map.listener), map.domlistener);
-  }
-  
-  function removeBindDom(map, data, key)
-  {
-    map.node.removeEventListener((key || map.listener), map.domlistener);
-  }
-  
-  /* ENDREGION */
-  
-  /* TODO: convert properties on object to '-' format */
-  function bindValuesData(key, map, data)
-  {
-    var localmap,
-        len = map.values.length,
-        x = 0;
-    
-    for(x;x<len;x++)
-    {
-      localmap = map.values[x];
-      if(typeof localmap !== 'string')
-      {
-        localmap.value = data.get(localmap.key);
-        if(typeof localmap.value === 'function')
-        {
-          bindFunction(localmap, data);
-        }
-        else
-        {
-          bindData(localmap, data);
-        }
-      }
-    }
-  }
-  
   /* ENDREGION */
   
   function Kaleoi(config)

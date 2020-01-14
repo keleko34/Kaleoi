@@ -1,0 +1,88 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Test Czosnek",
+      "type": "npm",
+      "script": "test",
+      "path": "submodules/czosnek/",
+      "group": "test",
+      "isBackground": true,
+      "problemMatcher": [
+        {
+          "pattern": [
+            {
+              "regexp": ".",
+              "file": 1,
+              "location": 2,
+              "message": 3
+            }
+          ],
+          "background": {
+            "activeOnStart": true,
+            "beginsPattern": ".",
+            "endsPattern": ".",
+          }
+        }
+      ]
+    },
+    {
+      "label": "Build Czosnek",
+      "type": "npm",
+      "script": "build",
+      "path": "submodules/czosnek/",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Test Frytki",
+      "type": "npm",
+      "script": "test",
+      "path": "submodules/frytki/",
+      "group": "test",
+      "isBackground": true,
+      "problemMatcher": [
+        {
+          "pattern": [
+            {
+              "regexp": ".",
+              "file": 1,
+              "location": 2,
+              "message": 3
+            }
+          ],
+          "background": {
+            "activeOnStart": true,
+            "beginsPattern": ".",
+            "endsPattern": ".",
+          }
+        }
+      ]
+    },
+    {
+      "label": "Test Pikantny",
+      "type": "npm",
+      "script": "test",
+      "path": "submodules/pikantny/",
+      "group": "test",
+      "isBackground": true,
+      "problemMatcher": [
+        {
+          "pattern": [
+            {
+              "regexp": ".",
+              "file": 1,
+              "location": 2,
+              "message": 3
+            }
+          ],
+          "background": {
+            "activeOnStart": true,
+            "beginsPattern": ".",
+            "endsPattern": ".",
+          }
+        }
+      ]
+    }
+  ]
+}

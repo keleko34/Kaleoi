@@ -1,0 +1,52 @@
+{
+  "name": "peprze",
+  "version": "1.5.43",
+  "description": "A simple Promise shim and functionality extension",
+  "main": "peprze.js",
+  "scripts": {
+    "test": "node ./test/run.js",
+    "build": "node ./build.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/keleko34/peprze.git"
+  },
+  "author": "keleko34",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/keleko34/peprze/issues"
+  },
+  "homepage": "https://github.com/keleko34/peprze#readme",
+  "devDependencies": {
+    "chai": "4.1.2",
+    "connect": "3.6.5",
+    "google-closure-compiler-js": "20180402.0.0",
+    "lodash": "4.17.15",
+    "mocha": "4.0.1",
+    "opn": "5.4.0",
+    "serve-static": "1.13.1",
+    "sinon": "4.1.2",
+    "sinon-chai": "2.14.0"
+  },
+  "eslintConfig": {
+    "env": {
+      "node": true,
+      "browser": true
+    },
+    "globals": {
+      "define": true,
+      "module": true,
+      "Promise": true,
+      "czosnek": true,
+      "pikantny": true,
+      "solone": true
+    },
+    "rules": {
+      "no-console": "off",
+      "no-empty": "off"
+    },
+    "parserOptions": {
+      "ecmaVersion": 2017
+    }
+  }
+}

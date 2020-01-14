@@ -1,4 +1,5 @@
 var base = process.cwd().replace(/\\/g,'/'),
+    fs = require('fs'),
     exec = require('child_process').exec,
     pkg = require(base + '/package.json'),
     modules = ['czosnek', 'frytki', 'peprze', 'pikantny', 'solone'],
@@ -72,6 +73,21 @@ function updateVersions()
   })
 }
 
+function updateDependencyVersions()
+{
+  return new Promise((resolve, reject) => {
+    Object.keys(pkg.dependencies)
+      .forEach((key) => {
+        pkg.dependencies[key] = ver;
+      })
+    
+    fs.writeFile(base + '/package.json', JSON.stringify(pkg, { spacing: 2 }), (err) => {
+      if(err) return reject(err);
+      resolve();
+    });
+  });
+}
+
 function squashCommits()
 {
   return new Promise((resolve, reject) => {
@@ -118,6 +134,7 @@ function publishToNPM()
 checkForUnfinishedCommits()
 .then(buildLibraries)
 .then(updateVersions)
+.then(updateDependencyVersions)
 .then(squashCommits)
 .then(pushUpdateToGit)
 .then(publishToNPM)
