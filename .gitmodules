@@ -7,9 +7,6 @@
 [submodule "submodules/czosnek"]
 	path = submodules/czosnek
 	url = https://github.com/keleko34/czosnek.git
-[submodule "submodules/peprze"]
-	path = submodules/peprze
-	url = https://github.com/keleko34/peprze.git
 [submodule "submodules/pikantny"]
 	path = submodules/pikantny
 	url = https://github.com/keleko34/pikantny.git
