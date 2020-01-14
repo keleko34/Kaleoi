@@ -2,3 +2,5 @@ submodules
 scripts
 test
 .vscode
+.gitignore
+.gitmodules
