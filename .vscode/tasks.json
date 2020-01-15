@@ -2,6 +2,39 @@
   "version": "2.0.0",
   "tasks": [
     {
+      "label": "Test Kaleoi",
+      "type": "npm",
+      "script": "test",
+      "path": "/",
+      "group": "test",
+      "isBackground": true,
+      "problemMatcher": [
+        {
+          "pattern": [
+            {
+              "regexp": ".",
+              "file": 1,
+              "location": 2,
+              "message": 3
+            }
+          ],
+          "background": {
+            "activeOnStart": true,
+            "beginsPattern": ".",
+            "endsPattern": ".",
+          }
+        }
+      ]
+    },
+    {
+      "label": "Build Kaleoi",
+      "type": "npm",
+      "script": "build",
+      "path": "/",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
       "label": "Test Czosnek",
       "type": "npm",
       "script": "test",
@@ -60,6 +93,14 @@
       ]
     },
     {
+      "label": "Build Frytki",
+      "type": "npm",
+      "script": "build",
+      "path": "submodules/frytki/",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
       "label": "Test Pikantny",
       "type": "npm",
       "script": "test",
@@ -83,6 +124,47 @@
           }
         }
       ]
-    }
+    },
+    {
+      "label": "Build Pikantny",
+      "type": "npm",
+      "script": "build",
+      "path": "submodules/pikantny/",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Test Solone",
+      "type": "npm",
+      "script": "test",
+      "path": "submodules/solone/",
+      "group": "test",
+      "isBackground": true,
+      "problemMatcher": [
+        {
+          "pattern": [
+            {
+              "regexp": ".",
+              "file": 1,
+              "location": 2,
+              "message": 3
+            }
+          ],
+          "background": {
+            "activeOnStart": true,
+            "beginsPattern": ".",
+            "endsPattern": ".",
+          }
+        }
+      ]
+    },
+    {
+      "label": "Build Solone",
+      "type": "npm",
+      "script": "build",
+      "path": "submodules/solone/",
+      "group": "build",
+      "problemMatcher": []
+    },
   ]
 }

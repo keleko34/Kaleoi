@@ -45,8 +45,6 @@ function getSubmodules()
 function updatePackageVersions(path, dependencies)
 {
   return new Promise((resolve, reject) => {
-    console.log(`Updating ${path} Dependencies....`);
-
     const pkg = require(path);
 
     pkg.devDependencies = dependencies;
@@ -61,6 +59,7 @@ function updatePackages(dependencies)
 {
   return getSubmodules()
     .then((paths) => {
+      console.log(`Updating package.json devDependencies....`);
       paths.unshift(`${base}/package.json`);
       return Promise.all(paths.map(path => updatePackageVersions(path, dependencies)));
     });
@@ -87,7 +86,7 @@ function commitChanges()
           submoduleCommit = 'git submodule foreach "git add -A && git commit -m \\"Update dev package dependencies\\""';
 
     console.log('Commiting Changes to Git');
-    exec(`${mainCommit} && ${submoduleCommit}`, (err, stdout, stderr) => {
+    exec(`${submoduleCommit} && ${mainCommit}`, (err, stdout, stderr) => {
       if(err) return reject(err);
       resolve();
     });
