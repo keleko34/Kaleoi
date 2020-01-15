@@ -2,7 +2,6 @@ var base = process.cwd().replace(/\\/g,'/'),
     fs = require('fs'),
     exec = require('child_process').exec,
     pkg = require(base + '/package.json'),
-    modules = ['czosnek', 'frytki', 'peprze', 'pikantny', 'solone'],
     ver = getVersion();
 
 function getVersion()
@@ -79,9 +78,9 @@ function updateDependencyVersions()
     Object.keys(pkg.dependencies)
       .forEach((key) => {
         pkg.dependencies[key] = ver;
-      })
+      });
     
-    fs.writeFile(base + '/package.json', JSON.stringify(pkg, null, 2), (err) => {
+    fs.writeFile(`${base}/package.json`, JSON.stringify(pkg, null, 2), (err) => {
       if(err) return reject(err);
       resolve();
     });
@@ -91,9 +90,9 @@ function updateDependencyVersions()
 function squashCommits()
 {
   return new Promise((resolve, reject) => {
-    var updateMain = `git add -A && git commit -m "Update submodule versions"`,
-        squashMain = `git reset --hard HEAD~3 && git merge --squash HEAD@{1} && git commit -m "Update to ${ver}"` 
-        squashModules = `git submodule foreach "git reset --hard HEAD~2 && git merge --squash HEAD@{1} && git commit -m \\"Update to ${ver}\\""`;
+    const updateMain = `git add -A && git commit -m "Update submodule versions"`,
+          squashMain = `git reset --hard HEAD~3 && git merge --squash HEAD@{1} && git commit -m "Update to ${ver}"` 
+          squashModules = `git submodule foreach "git reset --hard HEAD~2 && git merge --squash HEAD@{1} && git commit -m \\"Update to ${ver}\\""`;
 
     console.log(`Squashing commits from publish script...`);
     exec(`${squashModules} && ${updateMain} && ${squashMain}`, (err, stdout, stderr) => {
@@ -106,8 +105,8 @@ function squashCommits()
 function pushUpdateToGit()
 {
   return new Promise((resolve, reject) => {
-    var updateMain = `git push origin master && git push -u origin v${ver}`,
-        updateModules = `git submodule foreach "git push -u origin master && git push -u origin v${ver}"`;
+    const updateMain = `git push origin master && git push -u origin v${ver}`,
+          updateModules = `git submodule foreach "git push -u origin master && git push -u origin v${ver}"`;
 
     console.log(`Pushing changes to git...`);
     exec(`${updateMain} && ${updateModules}`, (err, stdout, stderr) => {
@@ -141,4 +140,4 @@ checkForUnfinishedCommits()
 .then(() => {
   console.log(`Successfully published ${ver}`)
 })
-.catch((err) => console.error(err));
+.catch(console.error);
