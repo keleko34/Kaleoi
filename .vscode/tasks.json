@@ -27,6 +27,30 @@
       ]
     },
     {
+      "label": "Debug Kaleoi",
+      "type": "npm",
+      "script": "debug",
+      "path": "/",
+      "isBackground": true,
+      "problemMatcher": [
+        {
+          "pattern": [
+            {
+              "regexp": ".",
+              "file": 1,
+              "location": 2,
+              "message": 3
+            }
+          ],
+          "background": {
+            "activeOnStart": true,
+            "beginsPattern": ".",
+            "endsPattern": ".",
+          }
+        }
+      ]
+    },
+    {
       "label": "Build Kaleoi",
       "type": "npm",
       "script": "build",
@@ -40,6 +64,30 @@
       "script": "test",
       "path": "submodules/czosnek/",
       "group": "test",
+      "isBackground": true,
+      "problemMatcher": [
+        {
+          "pattern": [
+            {
+              "regexp": ".",
+              "file": 1,
+              "location": 2,
+              "message": 3
+            }
+          ],
+          "background": {
+            "activeOnStart": true,
+            "beginsPattern": ".",
+            "endsPattern": ".",
+          }
+        }
+      ]
+    },
+    {
+      "label": "Debug Czosnek",
+      "type": "npm",
+      "script": "debug",
+      "path": "submodules/czosnek/",
       "isBackground": true,
       "problemMatcher": [
         {
@@ -93,6 +141,30 @@
       ]
     },
     {
+      "label": "Debug Frytki",
+      "type": "npm",
+      "script": "debug",
+      "path": "submodules/frytki/",
+      "isBackground": true,
+      "problemMatcher": [
+        {
+          "pattern": [
+            {
+              "regexp": ".",
+              "file": 1,
+              "location": 2,
+              "message": 3
+            }
+          ],
+          "background": {
+            "activeOnStart": true,
+            "beginsPattern": ".",
+            "endsPattern": ".",
+          }
+        }
+      ]
+    },
+    {
       "label": "Build Frytki",
       "type": "npm",
       "script": "build",
@@ -126,6 +198,30 @@
       ]
     },
     {
+      "label": "Debug Pikantny",
+      "type": "npm",
+      "script": "debug",
+      "path": "submodules/pikantny/",
+      "isBackground": true,
+      "problemMatcher": [
+        {
+          "pattern": [
+            {
+              "regexp": ".",
+              "file": 1,
+              "location": 2,
+              "message": 3
+            }
+          ],
+          "background": {
+            "activeOnStart": true,
+            "beginsPattern": ".",
+            "endsPattern": ".",
+          }
+        }
+      ]
+    },
+    {
       "label": "Build Pikantny",
       "type": "npm",
       "script": "build",
@@ -139,6 +235,30 @@
       "script": "test",
       "path": "submodules/solone/",
       "group": "test",
+      "isBackground": true,
+      "problemMatcher": [
+        {
+          "pattern": [
+            {
+              "regexp": ".",
+              "file": 1,
+              "location": 2,
+              "message": 3
+            }
+          ],
+          "background": {
+            "activeOnStart": true,
+            "beginsPattern": ".",
+            "endsPattern": ".",
+          }
+        }
+      ]
+    },
+    {
+      "label": "Debug Solone",
+      "type": "npm",
+      "script": "debug",
+      "path": "submodules/solone/",
       "isBackground": true,
       "problemMatcher": [
         {

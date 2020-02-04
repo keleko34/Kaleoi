@@ -25,4 +25,9 @@ module.exports = {
   
   /* Allows setting a function to parse URIs and return the parsed version (Helpful for non standard decoders) */
   uriDecoder: undefined,
+
+  designPatterns: ['atoms', 'molecules', 'organisms', 'templates', 'pages'],
+
+  /* Design patterns such as `atoms, molecules` etc are on by default. if you would like a flat hierchy of just components, this can be turned off */
+  useDesignPatterns: true
 }

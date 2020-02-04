@@ -12,6 +12,14 @@
       "preLaunchTask": "Test Kaleoi"
     },
     {
+      "name": "Debug Kaleoi",
+      "type": "node",
+      "request": "attach",
+      "port": 9229,
+      "sourceMaps": true,
+      "preLaunchTask": "Debug Kaleoi"
+    },
+    {
       "name": "Test Czosnek",
       "type": "chrome",
       "request": "launch",
@@ -20,6 +28,14 @@
       "sourceMaps": true,
       "webRoot": "${workspaceRoot}/submodules/czosnek",
       "preLaunchTask": "Test Czosnek"
+    },
+    {
+      "name": "Debug Czosnek",
+      "type": "node",
+      "request": "attach",
+      "port": 9229,
+      "sourceMaps": true,
+      "preLaunchTask": "Debug Czosnek"
     },
     {
       "name": "Test Frytki",
@@ -32,6 +48,14 @@
       "preLaunchTask": "Test Frytki"
     },
     {
+      "name": "Debug Frytki",
+      "type": "node",
+      "request": "attach",
+      "port": 9229,
+      "sourceMaps": true,
+      "preLaunchTask": "Debug Frytki"
+    },
+    {
       "name": "Test Pikantny",
       "type": "chrome",
       "request": "launch",
@@ -40,6 +64,14 @@
       "sourceMaps": true,
       "webRoot": "${workspaceRoot}/submodules/czosnek",
       "preLaunchTask": "Test Pikantny"
+    },
+    {
+      "name": "Debug Pikantny",
+      "type": "node",
+      "request": "attach",
+      "port": 9229,
+      "sourceMaps": true,
+      "preLaunchTask": "Debug Pikantny"
     },
     {
       "name": "Test Solone",
@@ -51,5 +83,13 @@
       "webRoot": "${workspaceRoot}/submodules/solone",
       "preLaunchTask": "Test Solone"
     }
+    {
+      "name": "Debug Solone",
+      "type": "node",
+      "request": "attach",
+      "port": 9229,
+      "sourceMaps": true,
+      "preLaunchTask": "Debug Solone"
+    },
   ]
 }

@@ -5,6 +5,7 @@
   "main": "kaleoi.min.js",
   "scripts": {
     "test": "node ./scripts/test.js",
+    "debug": "node --inspect-brk ./scripts/test.js",
     "build": "node ./scripts/build.js",
     "publish:npm": "node ./scripts/publish.js",
     "update:npm": "node ./scripts/update.js"
