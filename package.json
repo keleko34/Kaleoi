@@ -26,10 +26,10 @@
   },
   "homepage": "https://github.com/keleko34/kaleoi#readme",
   "dependencies": {
-    "czosnek": "1.5.46",
-    "frytki": "1.5.46",
-    "pikantny": "1.5.46",
-    "solone": "1.5.46"
+    "czosnek": "1.5.47",
+    "frytki": "1.5.47",
+    "pikantny": "1.5.47",
+    "solone": "1.5.47"
   },
   "devDependencies": {
     "benchmark": "2.1.4",
