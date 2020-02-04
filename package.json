@@ -1,6 +1,6 @@
 {
   "name": "kaleoi",
-  "version": "1.5.46",
+  "version": "1.5.47",
   "description": "Kaleoi MVVM Framework",
   "main": "kaleoi.min.js",
   "scripts": {
